@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.MaterialMapper">
+
+    <!-- 结果映射：解决数据库字段与实体类属性映射问题 -->
+    <resultMap id="MaterialResultMap" type="com.ruoyi.disaster.domain.Material">
+        <id column="id" property="id"/>
+        <result column="material_name" property="materialName"/>
+        <result column="material_type" property="materialType"/>
+        <result column="spec" property="spec"/>
+        <result column="stock_num" property="stockNum"/>
+        <result column="reserve_point_id" property="reservePointId"/>
+        <result column="quality_period" property="qualityPeriod"/>
+        <result column="priority_level" property="priorityLevel"/>
+        <result column="storage_condition" property="storageCondition"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 1. 查询所有物资列表 -->
+    <select id="queryAll" resultMap="MaterialResultMap">
+        SELECT id, material_name, material_type, spec, stock_num,
+               reserve_point_id, quality_period, priority_level, storage_condition,
+               create_time, update_time
+        FROM biz_material
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 2. 通过ID查询物资详情 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="MaterialResultMap">
+        SELECT id, material_name, material_type, spec, stock_num,
+               reserve_point_id, quality_period, priority_level, storage_condition,
+               create_time, update_time
+        FROM biz_material
+        WHERE id = #{id}
+    </select>
+
+    <!-- 3. 批量查询物资 -->
+    <select id="queryByIds" parameterType="java.util.Set" resultMap="MaterialResultMap">
+        SELECT id, material_name, material_type, spec, stock_num,
+        reserve_point_id, quality_period, priority_level, storage_condition,
+        create_time, update_time
+        FROM biz_material
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 4. 按条件查询物资 -->
+    <select id="queryByCondition" resultMap="MaterialResultMap">
+        SELECT id, material_name, material_type, spec, stock_num,
+        reserve_point_id, quality_period, priority_level, storage_condition,
+        create_time, update_time
+        FROM biz_material
+        <where>
+            <if test="materialType != null">AND material_type = #{materialType}</if>
+            <if test="priorityLevel != null">AND priority_level = #{priorityLevel}</if>
+            <if test="reservePointId != null">AND reserve_point_id = #{reservePointId}</if>
+        </where>
+        ORDER BY priority_level ASC, stock_num DESC
+    </select>
+
+    <!-- 5. 添加物资 -->
+    <insert id="saveMaterial" parameterType="com.ruoyi.disaster.domain.Material">
+        INSERT INTO biz_material (
+            material_name, material_type, spec, stock_num,
+            reserve_point_id, quality_period, priority_level, storage_condition,
+            create_time, update_time
+        ) VALUES (
+                     #{materialName}, #{materialType}, #{spec}, #{stockNum},
+                     #{reservePointId}, #{qualityPeriod}, #{priorityLevel}, #{storageCondition},
+                     NOW(), NOW()
+                 )
+    </insert>
+
+    <!-- 6. 修改物资信息 -->
+    <update id="updateMaterial" parameterType="com.ruoyi.disaster.domain.Material">
+        UPDATE biz_material
+        SET material_name = #{materialName},
+            material_type = #{materialType},
+            spec = #{spec},
+            stock_num = #{stockNum},
+            reserve_point_id = #{reservePointId},
+            quality_period = #{qualityPeriod},
+            priority_level = #{priorityLevel},
+            storage_condition = #{storageCondition},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 7. 更新物资库存 -->
+    <update id="updateStock" parameterType="java.lang.Long">
+        UPDATE biz_material
+        SET stock_num = #{newStockNum},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 8. 删除物资（单条） -->
+    <delete id="deleteMaterial" parameterType="java.lang.Long">
+        DELETE FROM biz_material WHERE id = #{id}
+    </delete>
+
+    <!-- 9. 批量删除物资 -->
+    <delete id="deleteMaterials" parameterType="java.util.Set">
+        DELETE FROM biz_material
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

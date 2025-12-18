@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.OrderMapper">
+
+    <resultMap id="OrderResultMap" type="com.ruoyi.disaster.domain.Order">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="disaster_id" property="disasterId"/>
+        <result column="material_id" property="materialId"/>
+        <result column="apply_num" property="applyNum"/>
+        <result column="actual_issue_num" property="actualIssueNum"/>
+        <result column="reserve_point_id" property="reservePointId"/>
+        <result column="target_address" property="targetAddress"/>
+        <result column="order_status" property="orderStatus"/>
+        <result column="audit_dept" property="auditDept"/>
+        <result column="audit_user_id" property="auditUserId"/>
+        <result column="transport_team" property="transportTeam"/>
+        <result column="sign_user" property="signUser"/>
+        <result column="sign_time" property="signTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="queryAll" parameterType="com.ruoyi.disaster.domain.Order" resultMap="OrderResultMap">
+        SELECT
+        id, order_no, user_id, disaster_id, material_id, apply_num,
+        actual_issue_num, reserve_point_id, target_address, order_status,
+        audit_dept, audit_user_id, transport_team, sign_user, sign_time,
+        create_time, update_time
+        FROM biz_order
+        <where>
+            <!-- 订单编号：模糊查询 -->
+            <if test="order.orderNo != null and order.orderNo != ''">
+                AND order_no LIKE CONCAT('%', #{order.orderNo}, '%')
+            </if>
+            <!-- 订单状态：精确匹配 -->
+            <if test="order.orderStatus != null">
+                AND order_status = #{order.orderStatus}
+            </if>
+            <!-- 申请人姓名：关联user表查询（模糊匹配） -->
+
+        </where>
+        <!-- 按申请时间降序，最新订单在前 -->
+        ORDER BY create_time DESC
+    </select>
+
+
+
+
+
+
+    <update id="updateOrder" parameterType="com.ruoyi.disaster.domain.Order">
+        UPDATE biz_order
+        <set>
+            <if test="orderStatus != null">order_status = #{orderStatus},</if>
+            <if test="transportTeam != null and transportTeam != ''">transport_team = #{transportTeam},</if>
+            <if test="auditDept != null and auditDept != ''">audit_dept = #{auditDept},</if>
+            <if test="auditUserId != null">audit_user_id = #{auditUserId},</if>
+            <if test="signUser != null and signUser != ''">sign_user = #{signUser},</if>
+            <if test="signTime != null">sign_time = #{signTime},</if>
+            <if test="actualIssueNum != null">actual_issue_num = #{actualIssueNum},</if>
+            <if test="updateTime != null">update_time = #{updateTime}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+
+
+
+
+
+    <!-- 1. 按ID查询订单 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="OrderResultMap">
+        SELECT id, order_no, user_id, disaster_id, material_id, apply_num,
+               actual_issue_num, reserve_point_id, target_address, order_status,
+               audit_dept, audit_user_id, transport_team, sign_user, sign_time,
+               create_time, update_time
+        FROM biz_order
+        WHERE id = #{id}
+    </select>
+
+    <!-- 2. 按用户ID查询订单列表 -->
+    <select id="queryByUserId" parameterType="java.lang.Long" resultMap="OrderResultMap">
+        SELECT id, order_no, user_id, disaster_id, material_id, apply_num,
+               actual_issue_num, reserve_point_id, target_address, order_status,
+               audit_dept, audit_user_id, transport_team, sign_user, sign_time,
+               create_time, update_time
+        FROM biz_order
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 3. 按订单状态查询订单列表 -->
+    <select id="queryByOrderStatus" parameterType="java.lang.Integer" resultMap="OrderResultMap">
+        SELECT id, order_no, user_id, disaster_id, material_id, apply_num,
+               actual_issue_num, reserve_point_id, target_address, order_status,
+               audit_dept, audit_user_id, transport_team, sign_user, sign_time,
+               create_time, update_time
+        FROM biz_order
+        WHERE order_status = #{orderStatus}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 4. 按灾情ID查询订单列表 -->
+    <select id="queryByDisasterId" parameterType="java.lang.Long" resultMap="OrderResultMap">
+        SELECT id, order_no, user_id, disaster_id, material_id, apply_num,
+               actual_issue_num, reserve_point_id, target_address, order_status,
+               audit_dept, audit_user_id, transport_team, sign_user, sign_time,
+               create_time, update_time
+        FROM biz_order
+        WHERE disaster_id = #{disasterId}
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="saveOrder" parameterType="com.ruoyi.disaster.domain.Order">
+        INSERT INTO biz_order (
+            order_no, user_id, disaster_id, material_id, apply_num,
+            target_address, order_status, create_time, update_time
+        ) VALUES (
+                     #{orderNo}, #{userId}, #{disasterId}, #{materialId}, #{applyNum},
+                     #{targetAddress}, #{orderStatus}, NOW(), NOW()
+                 )
+    </insert>
+
+    <!-- 6. 审核订单 -->
+    <update id="auditOrder">
+        UPDATE biz_order
+        SET order_status = #{orderStatus},
+            audit_user_id = #{auditUserId},
+            audit_dept = #{auditDept},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 7. 生成调度单 -->
+    <update id="generateDispatch">
+        UPDATE biz_order
+        SET transport_team = #{transportTeam},
+            order_status = 2, -- 调度中
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 8. 订单签收 -->
+    <update id="signOrder">
+        UPDATE biz_order
+        SET sign_user = #{signUser},
+            sign_time = #{signTime},
+            actual_issue_num = #{actualIssueNum},
+            order_status = 3, -- 已签收
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 9. 取消订单 -->
+    <update id="cancelOrder">
+        UPDATE biz_order
+        SET order_status = 4, -- 已取消
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+
+
+    <insert id="batchInsertOrder" parameterType="java.util.List">
+        INSERT INTO biz_order (
+        order_no, user_id, disaster_id, material_id, apply_num,
+        target_address, order_status, create_time, update_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.orderNo}, #{item.userId}, #{item.disasterId}, #{item.materialId}, #{item.applyNum},
+            #{item.targetAddress}, #{item.orderStatus}, NOW(), NOW()
+            )
+        </foreach>
+    </insert>
+
+
+
+
+
+
+    <!-- 10. 删除订单 -->
+    <delete id="deleteOrder" parameterType="java.lang.Long">
+        DELETE FROM biz_order WHERE id = #{id}
+    </delete>
+</mapper>

@@ -1,0 +1,24 @@
+# 开发环境配置
+server:
+  # 服务器的HTTP端口，默认为8081
+  port: 8080
+# MyBatis配置
+mybatis:
+  # 搜索指定包别名
+  typeAliasesPackage: com.ruoyi.disaster.**.domain
+  # 配置mapper的扫描，找到所有的mapper.xml映射文件
+  mapperLocations: classpath*:mapper/**/*Mapper.xml
+  # 加载全局的配置文件
+  configLocation: classpath:mybatis/mybatis-config.xml
+
+# Spring 数据源配置（核心：MySQL 连接信息）
+spring:
+  datasource:
+    # 1. MySQL 驱动类（MySQL 8.0+ 用 com.mysql.cj.jdbc.Driver，5.x 用 com.mysql.jdbc.Driver）
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 2. 数据库连接 URL（替换 数据库名、localhost:3306、用户名、密码）
+    url: jdbc:mysql://localhost:3306/ryvue?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=utf-8
+    # 3. 数据库用户名
+    username: root
+    # 4. 数据库密码
+    password: 123456

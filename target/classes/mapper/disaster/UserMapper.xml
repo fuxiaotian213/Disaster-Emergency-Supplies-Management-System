@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.ruoyi.disaster.domain.User">
+        <id column="id" property="id"/> <!-- 主键映射 -->
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="real_name" property="realName"/> <!-- 数据库 real_name → 实体类 realName -->
+        <result column="phone" property="phone"/>
+        <result column="role_id" property="roleId"/> <!-- 数据库 role_id → 实体类 roleId -->
+        <result column="unit" property="unit"/>
+        <result column="address" property="address"/>
+        <result column="create_time" property="createTime"/> <!-- 数据库 create_time → 实体类 createTime -->
+        <result column="update_time" property="updateTime"/> <!-- 数据库 update_time → 实体类 updateTime -->
+    </resultMap>
+
+    <!-- 1. 按ID查询用户 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="UserResultMap">
+        SELECT id, username, password, real_name, phone, role_id,
+               unit, address, create_time, update_time
+        FROM user
+        WHERE id = #{id}
+    </select>
+
+    <!-- 2. 按用户名查询用户 -->
+    <select id="queryByUsername" parameterType="java.lang.String" resultMap="UserResultMap">
+        SELECT id, username, password, real_name, phone, role_id,
+               unit, address, create_time, update_time
+        FROM user
+        WHERE username = #{username}
+    </select>
+
+    <!-- 3. 按角色ID查询用户列表 -->
+    <select id="queryByRoleId" parameterType="java.lang.Long" resultMap="UserResultMap">
+        SELECT id, username, password, real_name, phone, role_id,
+               unit, address, create_time, update_time
+        FROM user
+        WHERE role_id = #{roleId}
+        ORDER BY create_time DESC
+    </select>
+
+
+    <select id="selectUserByCondition" resultMap="UserResultMap">
+        SELECT
+        id, username, password, real_name, phone, role_id,
+        unit, address, create_time, update_time
+        FROM
+        user
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="roleId != null">
+                AND role_id = #{roleId}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+
+
+
+    <select id="selectAllUser" resultMap="UserResultMap">
+        SELECT
+            id,
+            username,
+            password,
+            real_name,  -- 数据库字段
+            phone,
+            role_id,    -- 数据库字段
+            unit,
+            address,
+            create_time,-- 数据库字段
+            update_time -- 数据库字段
+        FROM
+            user
+        ORDER BY
+            create_time DESC
+    </select>
+    <!-- 4. 新增用户 -->
+    <insert id="saveUser" parameterType="com.ruoyi.disaster.domain.User">
+        INSERT INTO user (
+            username, password, real_name, phone, role_id,
+            unit, address, create_time, update_time
+        ) VALUES (
+                     #{username}, #{password}, #{realName}, #{phone}, #{roleId},
+                     #{unit}, #{address}, NOW(), NOW()
+                 )
+    </insert>
+
+    <!-- 5. 修改用户信息 -->
+    <update id="updateUser" parameterType="com.ruoyi.disaster.domain.User">
+        UPDATE user
+        SET real_name = #{realName},
+            phone = #{phone},
+            role_id = #{roleId},
+            unit = #{unit},
+            address = #{address},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 6. 修改密码 -->
+    <update id="updatePassword">
+        UPDATE user
+        SET password = #{newPassword},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 7. 删除用户 -->
+    <delete id="deleteUser" parameterType="java.lang.Long">
+        DELETE FROM user WHERE id = #{id}
+    </delete>
+</mapper>

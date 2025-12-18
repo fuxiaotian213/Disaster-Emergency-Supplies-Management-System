@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.CarouselMapper">
+
+    <!-- 轮播图结果集映射 -->
+    <resultMap id="CarouselResultMap" type="com.ruoyi.disaster.domain.Carousel">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="image_url" property="imageUrl"/>
+        <result column="sort" property="sort"/>
+        <result column="status" property="status"/>
+        <result column="publish_dept" property="publishDept"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 1. 查询启用的轮播图列表（status=1） -->
+    <select id="queryEnabledList" resultMap="CarouselResultMap">
+        SELECT id, title, content, image_url, sort,
+        status, publish_dept, create_time, update_time
+        FROM sys_carousel
+        WHERE status = 1 <!-- 新增：筛选启用状态的轮播图 -->
+        ORDER BY sort ASC, create_time DESC
+    </select>
+
+    <select id="queryAll" resultMap="CarouselResultMap">
+        SELECT id, title, content, image_url, sort,
+               status, publish_dept, create_time, update_time
+        FROM sys_carousel
+        ORDER BY sort ASC, create_time DESC
+    </select>
+
+    <!-- 2. 按ID查询轮播图 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="CarouselResultMap">
+        SELECT id, title, content, image_url, sort,
+               status, publish_dept, create_time, update_time
+        FROM sys_carousel
+        WHERE id = #{id}
+    </select>
+
+
+    <!-- 3. 新增轮播图 -->
+    <insert id="saveCarousel" parameterType="com.ruoyi.disaster.domain.Carousel">
+        INSERT INTO sys_carousel (
+            title, content, image_url, sort,
+            status, publish_dept, create_time, update_time
+        ) VALUES (
+                     #{title}, #{content}, #{imageUrl}, #{sort},
+                     #{status}, #{publishDept}, NOW(), NOW()
+                 )
+    </insert>
+
+    <!-- 4. 修改轮播图 -->
+    <update id="updateCarousel" parameterType="com.ruoyi.disaster.domain.Carousel">
+        UPDATE sys_carousel
+        SET title = #{title},
+            content = #{content},
+            image_url = #{imageUrl},
+            sort = #{sort},
+            status = #{status},
+            publish_dept = #{publishDept},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 5. 删除轮播图 -->
+    <delete id="deleteCarousel" parameterType="java.lang.Long">
+        DELETE FROM sys_carousel WHERE id = #{id}
+    </delete>
+
+</mapper>

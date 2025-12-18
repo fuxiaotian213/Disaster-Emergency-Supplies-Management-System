@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.StockWarningMapper">
+
+    <!-- 库存预警结果集映射 -->
+    <resultMap id="StockWarningResultMap" type="com.ruoyi.disaster.domain.StockWarning">
+        <id column="id" property="id"/>
+        <result column="material_id" property="materialId"/>
+        <result column="reserve_point_id" property="reservePointId"/>
+        <result column="current_stock" property="currentStock"/>
+        <result column="warning_threshold" property="warningThreshold"/>
+        <result column="warning_status" property="warningStatus"/>
+        <result column="notify_dept" property="notifyDept"/>
+        <result column="handle_status" property="handleStatus"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <!-- 按ID删除库存预警 -->
+    <delete id="deleteStockWarning" parameterType="java.lang.Long">
+        DELETE FROM biz_stock_warning WHERE id = #{id}
+    </delete>
+
+    <!-- 1. 按预警状态查询预警列表 -->
+    <select id="queryByWarningStatus" parameterType="java.lang.Integer" resultMap="StockWarningResultMap">
+        SELECT id, material_id, reserve_point_id, current_stock, warning_threshold,
+               warning_status, notify_dept, handle_status, create_time, update_time
+        FROM biz_stock_warning
+        WHERE warning_status = #{warningStatus}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 2. 按物资ID查询预警 -->
+    <select id="queryByMaterialId" parameterType="java.lang.Long" resultMap="StockWarningResultMap">
+        SELECT id, material_id, reserve_point_id, current_stock, warning_threshold,
+               warning_status, notify_dept, handle_status, create_time, update_time
+        FROM biz_stock_warning
+        WHERE material_id = #{materialId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 查询所有库存预警 -->
+    <select id="queryAll" resultMap="StockWarningResultMap">
+        SELECT id, material_id, reserve_point_id, current_stock, warning_threshold,
+               warning_status, notify_dept, handle_status, create_time, update_time
+        FROM biz_stock_warning
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 按ID查询库存预警 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="StockWarningResultMap">
+        SELECT id, material_id, reserve_point_id, current_stock, warning_threshold,
+               warning_status, notify_dept, handle_status, create_time, update_time
+        FROM biz_stock_warning
+        WHERE id = #{id}
+    </select>
+
+    <!-- 3. 新增预警 -->
+    <insert id="saveStockWarning" parameterType="com.ruoyi.disaster.domain.StockWarning">
+        INSERT INTO biz_stock_warning (
+            material_id, reserve_point_id, current_stock, warning_threshold,
+            warning_status, notify_dept, handle_status, create_time, update_time
+        ) VALUES (
+                     #{materialId}, #{reservePointId}, #{currentStock}, #{warningThreshold},
+                     #{warningStatus}, #{notifyDept}, #{handleStatus}, NOW(), NOW()
+                 )
+    </insert>
+
+    <!-- 4. 更新预警处置状态 -->
+    <update id="updateHandleStatus">
+        UPDATE biz_stock_warning
+        SET handle_status = #{handleStatus},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>
