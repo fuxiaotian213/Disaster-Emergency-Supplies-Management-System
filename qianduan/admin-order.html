@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        .status-badge { padding: 0.3rem 0.6rem; border-radius: 0.3rem; color: white; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html" class="active">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>订单管理</h2>
+                    <div>
+                        <button class="btn btn-secondary" onclick="refreshOrderList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 搜索栏（补充申请人输入框） -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchOrderNo" placeholder="搜索订单编号">
+                            </div>
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchUserName" placeholder="搜索申请人">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchOrderStatus">
+                                    <option value="">所有状态</option>
+                                    <option value="0">待审核</option>
+                                    <option value="1">已通过</option>
+                                    <option value="2">调度中</option>
+                                    <option value="3">已签收</option>
+                                    <option value="4">已取消</option>
+                                    <option value="5">已驳回</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-info w-100" onclick="searchOrder()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>订单编号</th>
+                                        <th>申请人</th>
+                                        <th>关联灾情</th>
+                                        <th>申请物资</th>
+                                        <th>申请数量</th>
+                                        <th>接收地址</th>
+                                        <th>订单状态</th>
+                                        <th>运输团队</th>
+                                        <th>申请时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orderTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 订单操作模态框（审核/调度/签收） -->
+    <div class="modal fade" id="operateOrderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="operateModalTitle">订单操作</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="operateOrderId">
+                    <input type="hidden" id="currentStatus"> <!-- 存储当前状态 -->
+                    <div class="mb-3">
+                        <label class="form-label" id="operateStatusLabel">操作类型</label>
+                        <div class="form-check form-check-inline" id="operateStatusGroup">
+                            <!-- 动态加载操作类型 -->
+                        </div>
+                    </div>
+                    <div class="mb-3" id="transportTeamGroup" style="display: none;">
+                        <label for="transportTeam" class="form-label">运输团队</label>
+                        <input type="text" class="form-control" id="transportTeam" placeholder="请输入运输团队名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="operateRemark" class="form-label">操作备注（可选）</label>
+                        <textarea class="form-control" id="operateRemark" rows="3" placeholder="请输入操作备注"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitOrderOperate()">确认操作</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 数据映射（保留原逻辑）
+        const orderStatusMap = {
+            0: { text: '待审核', class: 'bg-secondary' },
+            1: { text: '已通过', class: 'bg-info' },
+            2: { text: '调度中', class: 'bg-primary' },
+            3: { text: '已签收', class: 'bg-success' },
+            4: { text: '已取消', class: 'bg-dark' },
+            5: { text: '已驳回', class: 'bg-danger' }
+        };
+
+        // 状态流转规则（保留原逻辑）
+        const statusOperateMap = {
+            0: [
+                { value: 1, text: '审核通过' },
+                { value: 5, text: '审核驳回' }
+            ],
+            1: [
+                { value: 2, text: '开始调度' }
+            ],
+            2: [
+                { value: 3, text: '标记签收' }
+            ]
+        };
+
+        // 5. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 发送GET请求的工具函数（新增）
+        async function fetchGet(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 7. 发送POST请求的工具函数（新增）
+        async function fetchPost(url, data) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 8. 获取关联数据名称（用户、灾情、物资）（Axios → Fetch改造）
+        async function getRelatedData(order) {
+            try {
+                // 并行获取关联数据（保留原性能优化逻辑）
+                const [userData, disasterData, materialData] = await Promise.all([
+                    fetchGet(`${apiBaseUrl}/user/getUserById?id=${order.userId}`),
+                    fetchGet(`${apiBaseUrl}/disaster/getDisasterById?id=${order.disasterId}`),
+                    fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${order.materialId}`)
+                ]);
+
+                return {
+                    userName: userData.realName || '未知用户',
+                    disasterName: disasterData.disasterName || '未知灾情',
+                    materialName: materialData.materialName || '未知物资'
+                };
+            } catch (err) {
+                console.error('获取关联数据失败：', err);
+                return {
+                    userName: '未知用户',
+                    disasterName: '未知灾情',
+                    materialName: '未知物资'
+                };
+            }
+        }
+
+        // 9. 加载订单列表（Axios → Fetch改造）
+        async function loadOrderList() {
+            showLoading(true);
+            try {
+                const orders = await fetchGet(`${apiBaseUrl}/order/getAllOrder`);
+                const tableBody = $('#orderTableBody');
+                tableBody.empty();
+
+                if (orders.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="10" class="text-center py-3">暂无订单数据</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                // 批量获取关联数据（保留原逻辑）
+                const relatedPromises = orders.map(order => getRelatedData(order));
+                const relatedDatas = await Promise.all(relatedPromises);
+
+                // 渲染表格（保留原逻辑）
+                orders.forEach((order, index) => {
+                    const related = relatedDatas[index];
+                    const status = orderStatusMap[order.orderStatus] || { text: '未知', class: 'bg-gray' };
+                    const canOperate = Object.keys(statusOperateMap).includes(order.orderStatus.toString());
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${order.orderNo || '无'}</td>
+                            <td>${related.userName}</td>
+                            <td>${related.disasterName}</td>
+                            <td>${related.materialName}</td>
+                            <td>${order.applyNum}</td>
+                            <td>${order.targetAddress}</td>
+                            <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                            <td>${order.transportTeam || '暂无'}</td>
+                            <td>${formatDate(order.createTime)}</td>
+                            <td>
+                                ${canOperate ? 
+                                    `<button class="btn btn-sm btn-primary me-2" onclick="showOperateModal(${order.id}, ${order.orderStatus})" data-bs-toggle="modal" data-bs-target="#operateOrderModal">操作</button>` : 
+                                    '<button class="btn btn-sm btn-primary me-2" disabled>无操作</button>'}
+                                <button class="btn btn-sm btn-danger" onclick="deleteOrder(${order.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('加载订单列表失败：', err);
+                alert('加载订单列表失败，请稍后重试：' + err.message);
+                $('#orderTableBody').html(`
+                    <tr>
+                        <td colspan="10" class="text-center py-3 text-danger">加载失败，请稍后重试</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 10. 搜索订单（Axios → Fetch改造）
+        async function searchOrder() {
+            showLoading(true);
+            const orderNo = $('#searchOrderNo').val().trim();
+            const orderStatus = $('#searchOrderStatus').val();
+            const userName = $('#searchUserName').val().trim();
+
+            try {
+                // 构建带参数的URL（添加参数编码）
+                let url = `${apiBaseUrl}/order/getAllOrder`;
+                const params = [];
+                if (orderNo) params.push(`orderNo=${encodeURIComponent(orderNo)}`);
+                if (orderStatus) params.push(`orderStatus=${encodeURIComponent(orderStatus)}`);
+                if (userName) params.push(`userName=${encodeURIComponent(userName)}`);
+                if (params.length > 0) url += `?${params.join('&')}`;
+
+                const orders = await fetchGet(url);
+                const tableBody = $('#orderTableBody');
+                tableBody.empty();
+
+                if (orders.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="10" class="text-center py-3">未找到符合条件的订单</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                // 批量获取关联数据（保留原逻辑）
+                const relatedPromises = orders.map(order => getRelatedData(order));
+                const relatedDatas = await Promise.all(relatedPromises);
+
+                // 渲染表格（保留原逻辑）
+                orders.forEach((order, index) => {
+                    const related = relatedDatas[index];
+                    const status = orderStatusMap[order.orderStatus] || { text: '未知', class: 'bg-gray' };
+                    const canOperate = Object.keys(statusOperateMap).includes(order.orderStatus.toString());
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${order.orderNo || '无'}</td>
+                            <td>${related.userName}</td>
+                            <td>${related.disasterName}</td>
+                            <td>${related.materialName}</td>
+                            <td>${order.applyNum}</td>
+                            <td>${order.targetAddress}</td>
+                            <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                            <td>${order.transportTeam || '暂无'}</td>
+                            <td>${formatDate(order.createTime)}</td>
+                            <td>
+                                ${canOperate ? 
+                                    `<button class="btn btn-sm btn-primary me-2" onclick="showOperateModal(${order.id}, ${order.orderStatus})" data-bs-toggle="modal" data-bs-target="#operateOrderModal">操作</button>` : 
+                                    '<button class="btn btn-sm btn-primary me-2" disabled>无操作</button>'}
+                                <button class="btn btn-sm btn-danger" onclick="deleteOrder(${order.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('搜索订单失败：', err);
+                alert('搜索订单失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 显示订单操作模态框（优化：存储当前状态 + 默认选中第一个操作）
+        function showOperateModal(orderId, currentStatus) {
+            $('#operateOrderId').val(orderId);
+            $('#currentStatus').val(currentStatus); // 存储当前状态到隐藏域
+            $('#operateRemark').val('');
+            $('#transportTeam').val('');
+            $('#transportTeamGroup').hide();
+
+            const operates = statusOperateMap[currentStatus] || [];
+            const group = $('#operateStatusGroup');
+            group.empty();
+
+            // 设置模态框标题
+            const currentStatusText = orderStatusMap[currentStatus]?.text || '未知状态';
+            $('#operateModalTitle').text(`订单操作 - 当前状态：${currentStatusText}`);
+            $('#operateStatusLabel').text(`请选择操作（当前：${currentStatusText}）`);
+
+            // 加载操作选项
+            operates.forEach((operate, index) => {
+                const isChecked = index === 0; // 默认选中第一个操作
+                group.append(`
+                    <input class="form-check-input" type="radio" name="operateStatus" id="operate-${operate.value}" value="${operate.value}" ${isChecked ? 'checked' : ''}>
+                    <label class="form-check-label" for="operate-${operate.value}">${operate.text}</label>
+                `);
+            });
+
+            // 初始化运输团队输入框显示状态（如果默认选中"开始调度"）
+            const defaultSelected = operates[0]?.value;
+            if (defaultSelected == 2) {
+                $('#transportTeamGroup').show();
+            }
+
+            // 当操作是"开始调度"时，显示运输团队输入框
+            $('input[name="operateStatus"]').change(function() {
+                const selectedValue = $(this).val();
+                $('#transportTeamGroup').toggle(selectedValue == 2);
+            });
+        }
+
+        // 12. 提交订单操作（修复oldStatus报错 + 优化提示）
+        async function submitOrderOperate() {
+            showLoading(true);
+            const orderId = $('#operateOrderId').val();
+            const currentStatus = $('#currentStatus').val(); // 从隐藏域获取当前状态
+            const orderStatus = $('input[name="operateStatus"]:checked').val();
+            const remark = $('#operateRemark').val().trim();
+            const transportTeam = $('#transportTeam').val().trim();
+
+            // 前端表单验证（保留原逻辑）
+            if (!orderStatus) {
+                alert('请选择操作类型');
+                showLoading(false);
+                return;
+            }
+            if (orderStatus == 2 && !transportTeam) {
+                alert('开始调度请填写运输团队名称');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                const updateData = {
+                    id: orderId,
+                    orderStatus,
+                    remark,
+                    transportTeam: orderStatus == 2 ? transportTeam : ''
+                };
+
+                // 审核通过时扣减库存（核心业务逻辑，保留原逻辑）
+                if (orderStatus == 1) {
+                    // 获取订单详情
+                    const order = await fetchGet(`${apiBaseUrl}/order/getOrderById?id=${orderId}`);
+                    // 获取物资详情
+                    const material = await fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${order.materialId}`);
+
+                    // 检查库存是否充足
+                    if (material.stockNum < order.applyNum) {
+                        alert(`库存不足！当前库存：${material.stockNum}，申请数量：${order.applyNum}`);
+                        showLoading(false);
+                        return;
+                    }
+
+                    // 扣减库存
+                    await fetchPost(`${apiBaseUrl}/material/updateMaterial`, {
+                        id: material.id,
+                        stockNum: material.stockNum - order.applyNum
+                    });
+                }
+
+                // 更新订单状态（无需依赖后端返回的orderStatus）
+                await fetchPost(`${apiBaseUrl}/order/updateOrder`, updateData);
+                
+                // 直接通过当前状态和目标状态获取操作文本（修复oldStatus报错）
+                const operateText = statusOperateMap[currentStatus]?.find(o => o.value == orderStatus)?.text || '操作';
+                alert(`${operateText}成功`);
+                
+                $('#operateOrderModal').modal('hide');
+                loadOrderList();
+            } catch (err) {
+                console.error('订单操作失败：', err);
+                alert('操作失败：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 删除订单（Axios → Fetch改造）
+       async function deleteOrder(id) {
+    if (!confirm('确定要删除该订单吗？删除后不可恢复')) {
+        return;
+    }
+
+    showLoading(true);
+    try {
+        // 改用 DELETE 方法请求，参数通过 URL 传递（与原逻辑兼容）
+        const response = await fetch(`${apiBaseUrl}/order/deleteOrder?id=${id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const res = await response.json();
+        if (res.code !== 200) {
+            throw new Error(res.msg || '删除失败');
+        }
+        alert('删除订单成功');
+        loadOrderList();
+    } catch (err) {
+        console.error('删除订单失败：', err);
+        alert('删除订单失败，请稍后重试：' + err.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+        // 14. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 15. 刷新列表（保留原逻辑）
+        function refreshOrderList() {
+            loadOrderList();
+        }
+
+        // 16. 页面加载时执行（保留原逻辑）
+        $(document).ready(loadOrderList);
+    </script>
+</body>
+</html>

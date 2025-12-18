@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灾情上报 - 用户端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .form-card { max-width: 800px; margin: 2rem auto; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.1); }
+        .img-preview { height: 200px; margin-top: 1rem; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; border-radius: 0.375rem; }
+        .img-preview img { max-height: 100%; max-width: 100%; object-fit: contain; }
+        .navbar { box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.1); }
+        .form-text { color: #6c757d; margin-top: 0.25rem; font-size: 0.875em; }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="user-index.html">应急物资调度系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#userNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="userNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="user-index.html">首页</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="user-disaster-report.html">灾情上报</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-material-apply.html">物资申请</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-order-query.html">申请进度</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-evaluation.html">评价反馈</a></li>
+                </ul>
+                <span class="navbar-text me-3" id="userInfo"></span>
+                <button class="btn btn-light" onclick="logout()">退出登录</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 表单卡片 -->
+    <div class="container">
+        <div class="card form-card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">灾情信息上报</h5>
+            </div>
+            <div class="card-body p-4">
+                <form id="disasterReportForm">
+                    <!-- 1. 灾情名称（必填） -->
+                    <div class="mb-3">
+                        <label for="disasterName" class="form-label fw-semibold">灾情名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="disasterName" name="disasterName" required 
+                               placeholder="例如：XX地区洪水灾害、XX县地震灾害">
+                        <div class="form-text">请准确描述灾情类型与发生区域，便于快速识别</div>
+                    </div>
+
+                    <!-- 2. 灾情分级（必填，匹配管理员端1-3级） -->
+                    <div class="mb-3">
+                        <label for="disasterLevel" class="form-label fw-semibold">灾情分级 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="disasterLevel" name="disasterLevel" required>
+                            <option value="">请选择灾情等级</option>
+                            <option value="1">一级（特别严重）- 参考：重大人员伤亡、大范围房屋倒塌（如地震9度以上）</option>
+                            <option value="2">二级（严重）- 参考：较多人员受灾、局部房屋损坏（如洪涝导致转移超1万人）</option>
+                            <option value="3">三级（较重）- 参考：少量人员受灾、零星房屋损坏（如风雹灾害）</option>
+                        </select>
+                        <div class="form-text">分级标准参考《国家自然灾害救助应急预案》，影响审核优先级</div>
+                    </div>
+
+                    <!-- 3. 受灾区域（必填，精确到乡镇/村） -->
+                    <div class="mb-3">
+                        <label for="disasterArea" class="form-label fw-semibold">受灾区域 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="disasterArea" name="disasterArea" required 
+                               placeholder="例如：甘肃省XX市XX县XX乡XX村">
+                        <div class="form-text">精确到村/社区，便于后续物资调度定位</div>
+                    </div>
+
+                    <!-- 4. 受灾人数（可选，默认0） -->
+                    <div class="mb-3">
+                        <label for="affectPeople" class="form-label fw-semibold">受灾人数</label>
+                        <input type="number" class="form-control" id="affectPeople" name="affectPeople" min="0" 
+                               placeholder="请输入受灾人数（可选，无则填0）">
+                        <div class="form-text">指因灾害导致生活受影响的人员总数（含转移安置人员）</div>
+                    </div>
+
+                    <!-- 5. 灾情描述（必填，补充引导性提示） -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label fw-semibold">灾情详细描述 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="description" name="description" rows="5" required 
+                                  placeholder="请包含以下信息：
+1. 发生时间（如2025年X月X日X时）
+2. 影响范围（如XX村3个村民小组）
+3. 损失情况（如倒塌房屋X间、农作物受灾X亩）
+4. 已采取措施（如转移X人至临时安置点）
+5. 急需帮助（如急需帐篷、饮用水）"></textarea>
+                    </div>
+
+                    <!-- 6. 审核部门（必填，匹配管理员端approveDept字段） -->
+                    <div class="mb-3">
+                        <label for="approveDept" class="form-label fw-semibold">审核部门 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="approveDept" name="approveDept" required>
+                            <option value="">请选择审核部门</option>
+                            <option value="应急管理局">XX市应急管理局（默认，负责综合灾情审核）</option>
+                            <option value="消防救援支队">XX市消防救援支队（侧重灾害救援类审核）</option>
+                            <option value="民政局">XX市民政局（侧重灾后救助类审核）</option>
+                            <option value="自定义">自定义部门</option>
+                        </select>
+                        <input type="text" class="form-control mt-2" id="approveDeptCustom" name="approveDeptCustom" 
+                               placeholder="请输入自定义部门名称（如XX县防汛办）" disabled>
+                    </div>
+
+                    <!-- 7. 灾情图片（可选，支持拖拽上传） -->
+                    <div class="mb-4">
+                        <label for="disasterImage" class="form-label fw-semibold">上传灾情图片</label>
+                        <input type="file" class="form-control" id="disasterImage" accept="image/*" 
+                               placeholder="上传图片可辅助灾情评估（可选）">
+                        <div class="img-preview" id="imgPreview">
+                            <span class="text-muted">点击上传图片或拖拽至此处预览（建议包含：灾害现场、房屋损坏、转移安置点等）</span>
+                        </div>
+                        <div class="form-text">支持JPG/PNG格式，单张不超过5MB，最多上传3张（可多次选择）</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2 fs-6">提交上报（提交后自动进入“待审核”状态）</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // ===================== 核心配置（必须修改为你的后端实际地址）=====================
+        const apiBaseUrl = "http://localhost:8080"; // 本地后端默认地址（端口8080）
+        // 服务器部署示例：const apiBaseUrl = "http://192.168.1.100:8080";
+        // 端口修改示例：const apiBaseUrl = "http://localhost:8080";
+
+        // 1. 登录状态验证（仅允许用户端账号，roleId=3）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId !== 3) {
+            alert('请先登录用户端账号，管理员账号无法上报灾情');
+            window.location.href = 'login.html';
+        }
+
+        // 2. 显示用户信息
+        $('#userInfo').text(`欢迎，${user.realName}（用户端）`);
+
+        // 3. 退出登录（清除本地存储）
+        function logout() {
+            if (confirm('确定要退出登录吗？未提交的上报内容将丢失')) {
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // 4. 审核部门下拉框逻辑（自定义部门显隐）
+        $('#approveDept').change(function() {
+            const isCustom = $(this).val() === '自定义';
+            $('#approveDeptCustom').prop('disabled', !isCustom);
+            if (isCustom) {
+                $('#approveDeptCustom').focus().attr('required', 'required');
+            } else {
+                $('#approveDeptCustom').removeAttr('required').val('');
+            }
+        });
+
+        // 5. 图片预览（支持点击+拖拽，匹配管理员端交互逻辑）
+        $('#disasterImage').change(handleImagePreview);
+        $('#imgPreview').on('dragover', (e) => {
+            e.preventDefault();
+            $('#imgPreview').css({
+                'border-color': '#0d6efd',
+                'background-color': 'rgba(13,110,253,0.05)'
+            });
+        });
+        $('#imgPreview').on('dragleave', () => {
+            $('#imgPreview').css({
+                'border-color': '#ccc',
+                'background-color': 'transparent'
+            });
+        });
+        $('#imgPreview').on('drop', (e) => {
+            e.preventDefault();
+            $('#imgPreview').css({
+                'border-color': '#ccc',
+                'background-color': 'transparent'
+            });
+            const file = e.originalEvent.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                $('#disasterImage')[0].files = e.originalEvent.dataTransfer.files;
+                handleImagePreview({ target: { files: [file] } });
+            } else {
+                alert('请上传图片格式文件（支持JPG、PNG）');
+            }
+        });
+
+        // 图片预览处理函数
+        function handleImagePreview(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // 校验文件大小（5MB以内）
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('图片大小超过5MB，请压缩后重新上传');
+                    $('#disasterImage').val('');
+                    return;
+                }
+                // 校验文件格式
+                if (!file.type.startsWith('image/')) {
+                    alert('请上传有效的图片文件（支持JPG、PNG）');
+                    $('#disasterImage').val('');
+                    return;
+                }
+                // 预览图片
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#imgPreview').html(`<img src="${e.target.result}" alt="灾情图片预览">`);
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 6. 表单提交（完全对齐管理员端数据结构）
+        $('#disasterReportForm').submit(async function(e) {
+            e.preventDefault();
+
+            // 6.1 收集表单数据（字段名与管理员端完全一致）
+            const disasterData = {
+                disasterName: $('#disasterName').val().trim(),
+                disasterLevel: parseInt($('#disasterLevel').val()), // 转为数字，匹配后端Integer类型
+                disasterArea: $('#disasterArea').val().trim(),
+                affectPeople: $('#affectPeople').val() ? parseInt($('#affectPeople').val()) : 0,
+                description: $('#description').val().trim(),
+                // 核心：统一字段名为approveDept（管理员端用此字段，替代原auditDept）
+                approveDept: $('#approveDept').val() === '自定义' 
+                    ? $('#approveDeptCustom').val().trim() 
+                    : $('#approveDept').val(),
+                reportUserId: user.id, // 上报人ID（当前登录用户）
+                approveStatus: 0, // 固定为0（待审核），匹配管理员端状态定义
+                approveRemark: '', // 初始为空，审核后由管理员填写
+                approveUserId: null // 初始为空，审核后关联管理员ID
+            };
+
+            // 6.2 表单校验（增强逻辑，避免后端字段缺失）
+            const validateErrors = [];
+            if (!disasterData.disasterName) validateErrors.push('请输入灾情名称');
+            if (isNaN(disasterData.disasterLevel)) validateErrors.push('请选择灾情分级');
+            if (!disasterData.disasterArea) validateErrors.push('请输入受灾区域');
+            if (!disasterData.description) validateErrors.push('请填写灾情详细描述');
+            if (!disasterData.approveDept) validateErrors.push('请选择或输入审核部门');
+            
+            if (validateErrors.length > 0) {
+                alert('请完善以下必填项：\n' + validateErrors.join('\n'));
+                return;
+            }
+
+            try {
+                // 6.3 发送请求（参数格式、请求头与管理员端一致）
+                const response = await axios.post(
+                    `${apiBaseUrl}/disaster/addDisaster`,
+                    disasterData,
+                    { headers: { 'Content-Type': 'application/json' } }
+                );
+
+                // 6.4 处理响应（匹配管理员端返回格式）
+                const res = response.data;
+                if (res.code === 200) {
+                    alert(`上报成功！\n灾情ID：${res.data?.id || '未知'}\n当前状态：待审核（可在“申请进度”页面查看审核结果）`);
+                    // 重置表单并跳转首页
+                    $('#disasterReportForm')[0].reset();
+                    $('#imgPreview').html('<span class="text-muted">点击上传图片或拖拽至此处预览</span>');
+                    window.location.href = 'user-index.html';
+                } else {
+                    alert('上报失败：' + (res.msg || '服务器处理异常，请稍后重试'));
+                }
+            } catch (error) {
+                // 6.5 错误处理（精准定位问题）
+                let errorMsg = '上报失败：';
+                if (error.message.includes('Network Error')) {
+                    errorMsg += `\n1. 网络连接错误，请检查：\n   - 后端服务是否已启动\n   - 后端地址是否正确（当前：${apiBaseUrl}）\n   - 后端是否配置跨域（需添加@CrossOrigin注解）`;
+                } else if (error.response?.status === 404) {
+                    errorMsg += '\n2. 接口路径错误，请确认后端接口为：/disaster/addDisaster';
+                } else if (error.response?.status === 400) {
+                    errorMsg += '\n3. 参数错误：' + (error.response.data?.msg || '请检查字段格式（如灾情等级应为数字）');
+                } else if (error.response?.status === 500) {
+                    errorMsg += '\n4. 后端服务错误，请查看后端控制台日志';
+                } else {
+                    errorMsg += error.message;
+                }
+                alert(errorMsg);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html" class="active">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>用户管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addUserModal">新增用户</button>
+                        <button class="btn btn-secondary" onclick="refreshUserList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 搜索栏（新增重置按钮） -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" id="searchUsername" placeholder="搜索用户名">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchRole">
+                                    <option value="">所有角色</option>
+                                    <option value="1">救援人员</option>
+                                    <option value="2">物资管理员</option>
+                                    <option value="3">受灾群众</option>
+                                    <option value="4">政府部门</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-info w-100" onclick="searchUser()">搜索</button>
+                            </div>
+                            <!-- 新增重置按钮 -->
+                            <div class="col-md-2">
+                                <button class="btn btn-secondary w-100" onclick="resetSearch()">重置（显示全部）</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>用户名</th>
+                                        <th>真实姓名</th>
+                                        <th>联系电话</th>
+                                        <th>角色</th>
+                                        <th>所属单位</th>
+                                        <th>地址</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="userTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增用户模态框 -->
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addUserForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="addUsername" class="form-label">用户名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addUsername" name="username" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addPassword" class="form-label">密码 <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="addPassword" name="password" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addRealName" class="form-label">真实姓名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addRealName" name="realName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addPhone" class="form-label">联系电话 <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="addPhone" name="phone" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addRoleId" class="form-label">角色 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addRoleId" name="roleId" required>
+                                    <option value="1">救援人员</option>
+                                    <option value="2">物资管理员</option>
+                                    <option value="3">受灾群众</option>
+                                    <option value="4">政府部门</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addUnit" class="form-label">所属单位</label>
+                                <input type="text" class="form-control" id="addUnit" name="unit">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addAddress" class="form-label">地址</label>
+                                <input type="text" class="form-control" id="addAddress" name="address">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddUser()">确认新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑用户模态框 -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editUserForm">
+                        <input type="hidden" id="editUserId" name="id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="editUsername" class="form-label">用户名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editUsername" name="username" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editPassword" class="form-label">密码（不填则保持原密码）</label>
+                                <input type="password" class="form-control" id="editPassword" name="password">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editRealName" class="form-label">真实姓名 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editRealName" name="realName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editPhone" class="form-label">联系电话 <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="editPhone" name="phone" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editRoleId" class="form-label">角色 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editRoleId" name="roleId" required>
+                                    <option value="1">救援人员</option>
+                                    <option value="2">物资管理员</option>
+                                    <option value="3">受灾群众</option>
+                                    <option value="4">政府部门</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editUnit" class="form-label">所属单位</label>
+                                <input type="text" class="form-control" id="editUnit" name="unit">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="editAddress" class="form-label">地址</label>
+                                <input type="text" class="form-control" id="editAddress" name="address">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitEditUser()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置
+        const baseUrl = 'http://localhost:8080';
+
+        // 2. 登录状态验证
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 角色映射
+        const roleMap = {1: '救援人员', 2: '物资管理员', 3: '受灾群众', 4: '政府部门'};
+
+        // 3. 加载状态控制
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 4. 退出登录
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 5. 日期格式化
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 6. 渲染用户表格（抽取公共方法，避免重复代码）
+        function renderUserTable(users) {
+            const tableBody = $('#userTableBody');
+            tableBody.empty();
+
+            // 无数据时显示提示
+            if (users.length === 0) {
+                tableBody.append(`
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">未找到相关用户数据</td>
+                    </tr>
+                `);
+                return;
+            }
+
+            // 渲染用户列表（统一处理null值）
+            users.forEach(user => {
+                tableBody.append(`
+                    <tr>
+                        <td>${user.id || '-'}</td>
+                        <td>${user.username || '-'}</td>
+                        <td>${user.realName || '-'}</td> <!-- 处理null显示 -->
+                        <td>${user.phone || '-'}</td>
+                        <td>${user.roleId ? roleMap[user.roleId] : '-'}</td> <!-- 兼容roleId为null -->
+                        <td>${user.unit || '-'}</td>
+                        <td>${user.address || '-'}</td>
+                        <td>${formatDate(user.createTime)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info me-2" onclick="editUser(${user.id})" data-bs-toggle="modal" data-bs-target="#editUserModal">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">删除</button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // 7. 加载所有用户
+        async function loadUserList() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${baseUrl}/user/getAllUser`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '加载用户列表失败');
+                }
+
+                renderUserTable(res.data); // 调用公共渲染方法
+            } catch (err) {
+                console.error('加载用户列表失败：', err);
+                alert('加载用户列表失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 8. 搜索用户（调用/searchUser接口）
+        async function searchUser() {
+            showLoading(true);
+            const username = $('#searchUsername').val().trim();
+            const roleId = $('#searchRole').val();
+
+            try {
+                // 构建搜索参数（空值不传递）
+                const params = new URLSearchParams();
+                if (username) params.append('username', username);
+                if (roleId) params.append('roleId', roleId);
+
+                // 调用后端/searchUser接口
+                const response = await fetch(`${baseUrl}/user/searchUser?${params.toString()}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '搜索用户失败');
+                }
+
+                renderUserTable(res.data); // 调用公共渲染方法
+            } catch (err) {
+                console.error('搜索用户失败：', err);
+                alert('搜索用户失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 9. 重置搜索（清空条件+显示全部）
+        function resetSearch() {
+            // 清空搜索框和下拉框
+            $('#searchUsername').val('');
+            $('#searchRole').val('');
+            // 重新加载所有用户
+            loadUserList();
+        }
+
+        // 10. 新增用户提交
+        async function submitAddUser() {
+            showLoading(true);
+            const userData = {
+                username: $('#addUsername').val().trim(),
+                password: $('#addPassword').val().trim(),
+                realName: $('#addRealName').val().trim(),
+                phone: $('#addPhone').val().trim(),
+                roleId: $('#addRoleId').val(),
+                unit: $('#addUnit').val().trim(),
+                address: $('#addAddress').val().trim()
+            };
+
+            if (!userData.username || !userData.password || !userData.realName || !userData.phone) {
+                alert('请填写必填字段');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${baseUrl}/user/addUser`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('新增用户成功');
+                    $('#addUserModal').modal('hide');
+                    $('#addUserForm')[0].reset();
+                    loadUserList();
+                } else {
+                    alert('新增用户失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('新增用户失败：', err);
+                alert('新增用户失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 加载编辑用户数据
+        async function editUser(id) {
+            showLoading(true);
+            try {
+                const response = await fetch(`${baseUrl}/user/getUserById?id=${id}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '加载用户数据失败');
+                }
+
+                const user = res.data;
+                // 填充表单（处理null值）
+                $('#editUserId').val(user.id || '');
+                $('#editUsername').val(user.username || '');
+                $('#editRealName').val(user.realName || '');
+                $('#editPhone').val(user.phone || '');
+                $('#editRoleId').val(user.roleId || 1); // 默认选中救援人员
+                $('#editUnit').val(user.unit || '');
+                $('#editAddress').val(user.address || '');
+                $('#editPassword').val('');
+            } catch (err) {
+                console.error('加载用户数据失败：', err);
+                alert('加载用户数据失败，请稍后重试：' + err.message);
+                $('#editUserModal').modal('hide');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 12. 提交编辑用户（修复接口地址：/updateUser → /modifyUser）
+        async function submitEditUser() {
+            showLoading(true);
+            const userData = {
+                id: $('#editUserId').val(),
+                username: $('#editUsername').val().trim(),
+                realName: $('#editRealName').val().trim(),
+                phone: $('#editPhone').val().trim(),
+                roleId: $('#editRoleId').val(),
+                unit: $('#editUnit').val().trim(),
+                address: $('#editAddress').val().trim()
+            };
+
+            const password = $('#editPassword').val().trim();
+            if (password) {
+                userData.password = password;
+            }
+
+            if (!userData.username || !userData.realName || !userData.phone) {
+                alert('请填写必填字段');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                // 修复接口地址：与后端Controller的/modifyUser一致
+                const response = await fetch(`${baseUrl}/user/modifyUser`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('修改用户成功');
+                    $('#editUserModal').modal('hide');
+                    loadUserList();
+                } else {
+                    alert('修改用户失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('修改用户失败：', err);
+                alert('修改用户失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 删除用户
+        async function deleteUser(id) {
+            if (!confirm('确定要删除该用户吗？删除后不可恢复')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${baseUrl}/user/deleteUser?id=${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('删除用户成功');
+                    loadUserList(); // 重新加载列表，避免DOM操作不一致
+                } else {
+                    alert('删除用户失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('删除用户失败：', err);
+                alert('删除用户失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 14. 刷新列表
+        function refreshUserList() {
+            // 清空搜索条件，重新加载全部
+            resetSearch();
+        }
+
+        // 页面加载时执行
+        $(document).ready(loadUserList);
+    </script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>申请进度查询 - 用户端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .table-card { max-width: 1200px; margin: 2rem auto; }
+        .status-badge { padding: 0.3rem 0.6rem; border-radius: 0.3rem; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="user-index.html">应急物资调度系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#userNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="userNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="user-index.html">首页</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-disaster-report.html">灾情上报</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-material-apply.html">物资申请</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="user-order-query.html">申请进度</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-evaluation.html">评价反馈</a></li>
+                </ul>
+                <span class="navbar-text me-3" id="userInfo"></span>
+                <button class="btn btn-light" onclick="logout()">退出登录</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card table-card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">我的物资申请进度</h5>
+                <button class="btn btn-light btn-sm" onclick="refreshOrderList()">刷新列表</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>订单编号</th>
+                                <th>关联灾情</th>
+                                <th>申请物资</th>
+                                <th>申请数量</th>
+                                <th>接收地址</th>
+                                <th>订单状态</th>
+                                <th>运输团队</th>
+                                <th>申请时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="emptyTip" class="text-center py-5 d-none">
+                    <h5>暂无申请记录</h5>
+                    <a href="user-material-apply.html" class="btn btn-primary mt-3">立即申请物资</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 加载状态控制
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // 登录状态校验
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId !== 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 显示用户信息
+        $('#userInfo').text(`欢迎，${user.realName}`);
+
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 订单状态映射
+        const statusMap = {
+            0: { text: '待审核', class: 'bg-secondary' },
+            1: { text: '已通过', class: 'bg-info' },
+            2: { text: '调度中', class: 'bg-primary' },
+            3: { text: '已签收', class: 'bg-success' },
+            4: { text: '已取消', class: 'bg-dark' },
+            5: { text: '已驳回', class: 'bg-danger' }
+        };
+
+        // GET请求工具函数
+        async function fetchGet(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`GET请求失败：${url}`, err);
+                throw err;
+            }
+        }
+
+        // POST请求工具函数
+        async function fetchPost(url, data = {}) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res;
+            } catch (err) {
+                console.error(`POST请求失败：${url}`, err);
+                throw err;
+            }
+        }
+
+        // 验证ID有效性（通用函数：过滤null/undefined/空字符串/0/NaN）
+        function isValidId(id) {
+            if (id === null || id === undefined) return false;
+            const strId = String(id).trim();
+            if (strId === "") return false;
+            const numId = Number(strId);
+            return !isNaN(numId) && numId > 0;
+        }
+
+        // 加载订单列表（核心修复）
+        async function loadOrderList() {
+            showLoading(true);
+            const tableBody = $('#orderTableBody');
+            const emptyTip = $('#emptyTip');
+            tableBody.empty();
+
+            try {
+                // 1. 查询当前用户的所有订单
+                const orders = await fetchGet(`${apiBaseUrl}/order/getOrderByUserId?userId=${user.id}`);
+
+                // 2. 无订单时显示空提示
+                if (orders.length === 0) {
+                    emptyTip.removeClass('d-none');
+                    return;
+                }
+                emptyTip.addClass('d-none');
+
+                // 3. 过滤：仅保留灾情ID和物资ID都有效的订单（核心修复）
+                const validOrders = orders.filter(order => {
+                    return isValidId(order.disasterId) && isValidId(order.materialId);
+                });
+
+                // 4. 无有效订单时显示友好提示
+                if (validOrders.length === 0) {
+                    tableBody.html(`<tr><td colspan="9" class="text-center py-3 text-muted">所有订单的关联灾情或物资信息无效，请联系管理员核实</td></tr>`);
+                    return;
+                }
+
+                // 5. 提取去重后的有效ID（确保无无效值）
+                const materialIds = [...new Set(validOrders.map(o => o.materialId))].filter(id => isValidId(id));
+                const disasterIds = [...new Set(validOrders.map(o => o.disasterId))].filter(id => isValidId(id));
+
+                // 6. 双重校验：ID数组非空（避免传空参数给接口）
+                if (materialIds.length === 0) {
+                    throw new Error('物资ID不能为空');
+                }
+                if (disasterIds.length === 0) {
+                    throw new Error('灾情ID不能为空');
+                }
+
+                // 7. 批量查询物资和灾情（修正路径：使用正确的复数形式）
+                const [materials, disasters] = await Promise.all([
+                    fetchGet(`${apiBaseUrl}/material/getMaterialByIds?ids=${encodeURIComponent(materialIds.join(','))}`),
+                    fetchGet(`${apiBaseUrl}/disaster/getDisasterByIds?ids=${encodeURIComponent(disasterIds.join(','))}`)
+                ]);
+
+                // 8. 构建映射表（避免循环查询）
+                const materialsMap = materials.reduce((map, m) => (map[m.id] = m, map), {});
+                const disastersMap = disasters.reduce((map, d) => (map[d.id] = d, map), {});
+
+                // 9. 渲染订单列表
+                validOrders.forEach(order => {
+                    const material = materialsMap[order.materialId] || { materialName: '未知物资' };
+                    const disaster = disastersMap[order.disasterId] || { disasterName: '未知灾情' };
+                    const status = statusMap[order.orderStatus] || { text: '未知状态', class: 'bg-gray' };
+
+                    // 操作按钮逻辑
+                    let operationBtn = '无操作';
+                    if (order.orderStatus === 0) {
+                        operationBtn = `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${order.id})">取消申请</button>`;
+                    } else if (order.orderStatus === 3) {
+                        operationBtn = `<button class="btn btn-sm btn-success" onclick="goToEvaluate(${order.id})">评价反馈</button>`;
+                    }
+
+                    // 拼接表格行
+                    tableBody.append(`
+                        <tr>
+                            <td>${order.orderNo || '无'}</td>
+                            <td>${disaster.disasterName}</td>
+                            <td>${material.materialName}</td>
+                            <td>${order.applyNum || 0}</td>
+                            <td>${order.targetAddress || '无'}</td>
+                            <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                            <td>${order.transportTeam || '暂无'}</td>
+                            <td>${formatDate(order.createTime)}</td>
+                            <td>${operationBtn}</td>
+                        </tr>
+                    `);
+                });
+
+            } catch (err) {
+                // 精准错误提示
+                console.error('加载订单失败：', err);
+                const errorMsg = err.message || '加载失败，请稍后重试';
+                alert(`加载申请进度失败：${errorMsg}`);
+                tableBody.html(`
+                    <tr>
+                        <td colspan="9" class="text-center py-3 text-danger">${errorMsg}</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 取消订单
+        async function cancelOrder(orderId) {
+            if (!confirm('确定要取消该申请吗？取消后不可恢复')) return;
+            showLoading(true);
+            try {
+                await fetchPost(`${apiBaseUrl}/order/cancelOrder?id=${orderId}`);
+                alert('取消成功');
+                loadOrderList(); // 刷新列表
+            } catch (err) {
+                alert(`取消失败：${err.message || '网络异常'}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 前往评价反馈
+        function goToEvaluate(orderId) {
+            window.location.href = `user-evaluation.html?orderId=${orderId}`;
+        }
+
+        // 日期格式化（兼容空值）
+        function formatDate(dateStr) {
+            if (!dateStr) return '无';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch (err) {
+                return '日期格式错误';
+            }
+        }
+
+        // 刷新订单列表
+        function refreshOrderList() {
+            loadOrderList();
+        }
+
+        // 页面加载时初始化
+        $(document).ready(loadOrderList);
+    </script>
+</body>
+</html>

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>意见反馈 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        .status-badge { padding: 0.3rem 0.6rem; border-radius: 0.3rem; color: white; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html" class="active">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>意见反馈管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" onclick="batchHandleFeedback(1)">标记全部已处理</button>
+                        <button class="btn btn-secondary" onclick="refreshFeedbackList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 反馈统计卡片 -->
+                <div class="row mb-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-primary/10 border-primary shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">总反馈数</h5>
+                                <h2 class="card-text" id="totalFeedbackCount">0</h2>
+                                <p class="card-text">用户提交的所有反馈总数</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-warning/10 border-warning shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">待处理反馈</h5>
+                                <h2 class="card-text" id="pendingFeedbackCount">0</h2>
+                                <p class="card-text">未处理的用户反馈数</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card bg-success/10 border-success shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-success">已处理反馈</h5>
+                                <h2 class="card-text" id="handledFeedbackCount">0</h2>
+                                <p class="card-text">已处理并回复的反馈数</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜索栏 -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchFeedbackUser" placeholder="搜索反馈用户">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchFeedbackType">
+                                    <option value="">所有类型</option>
+                                    <option value="1">功能建议</option>
+                                    <option value="2">系统问题</option>
+                                    <option value="3">服务投诉</option>
+                                    <option value="4">其他反馈</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchFeedbackStatus">
+                                    <option value="">所有状态</option>
+                                    <option value="0">待处理</option>
+                                    <option value="1">已处理</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-info w-100" onclick="searchFeedback()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 反馈列表表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>反馈用户</th>
+                                        <th>反馈类型</th>
+                                        <th>反馈标题</th>
+                                        <th>反馈时间</th>
+                                        <th>处理状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="feedbackTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查看反馈详情模态框 -->
+    <div class="modal fade" id="viewFeedbackModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="feedbackModalTitle">反馈详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="currentFeedbackId">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <h6>基本信息</h6>
+                            <p><strong>反馈用户：</strong><span id="feedbackUserName">-</span></p>
+                            <p><strong>反馈类型：</strong><span id="feedbackTypeText">-</span></p>
+                            <p><strong>反馈时间：</strong><span id="feedbackCreateTime">-</span></p>
+                            <p><strong>处理状态：</strong><span id="feedbackStatusText">-</span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>联系方式（用户自愿提供）</h6>
+                            <p><strong>联系电话：</strong><span id="feedbackUserPhone">-</span></p>
+                            <p><strong>电子邮箱：</strong><span id="feedbackUserEmail">-</span></p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <h6>反馈内容</h6>
+                        <div class="p-3 border rounded bg-light" id="feedbackContent">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <h6>处理回复</h6>
+                        <textarea class="form-control" id="feedbackReply" rows="4" placeholder="请输入处理回复内容（已处理状态必填）"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="handleFeedbackBtn" onclick="handleFeedback()">标记为已处理</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 数据映射（保留原逻辑）
+        const feedbackTypeMap = {1: '功能建议', 2: '系统问题', 3: '服务投诉', 4: '其他反馈'};
+        const feedbackStatusMap = {0: '待处理', 1: '已处理'};
+        const statusBadgeMap = {0: 'bg-warning', 1: 'bg-success'};
+
+        // 5. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 加载反馈统计（Axios → Fetch改造）
+        async function loadFeedbackStatistics() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/evaluation/getFeedbackStatistics`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200 || !res.data) {
+                    throw new Error(res.msg || '加载统计失败');
+                }
+
+                const stats = res.data;
+                $('#totalFeedbackCount').text(stats.total || 0);
+                $('#pendingFeedbackCount').text(stats.pending || 0);
+                $('#handledFeedbackCount').text(stats.handled || 0);
+            } catch (err) {
+                console.error('加载反馈统计失败：', err);
+                $('#totalFeedbackCount').text(0);
+                $('#pendingFeedbackCount').text(0);
+                $('#handledFeedbackCount').text(0);
+            }
+        }
+
+        // 7. 加载反馈列表（Axios → Fetch改造）
+        async function loadFeedbackList() {
+            showLoading(true);
+            try {
+                // 1. 获取所有反馈
+                const feedbackResponse = await fetch(`${apiBaseUrl}/evaluation/getAllFeedback`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const feedbackRes = await feedbackResponse.json();
+                if (feedbackRes.code !== 200) {
+                    throw new Error(feedbackRes.msg || '加载反馈列表失败');
+                }
+
+                const feedbacks = feedbackRes.data;
+                const tableBody = $('#feedbackTableBody');
+                tableBody.empty();
+
+                if (feedbacks.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="7" class="text-center py-3">暂无用户反馈</td>
+                        </tr>
+                    `);
+                    loadFeedbackStatistics();
+                    showLoading(false);
+                    return;
+                }
+
+                // 2. 批量获取用户信息
+                const userIds = [...new Set(feedbacks.map(f => f.userId))];
+                const userResponse = await fetch(`${apiBaseUrl}/user/getUserByIds?ids=${encodeURIComponent(userIds.join(','))}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const userRes = await userResponse.json();
+                const userMap = userRes.code === 200 && userRes.data 
+                    ? userRes.data.reduce((map, u) => (map[u.id] = u, map), {}) 
+                    : {};
+
+                // 3. 渲染表格
+                feedbacks.forEach(feedback => {
+                    const userInfo = userMap[feedback.userId] || {};
+                    const statusBadge = `<span class="status-badge ${statusBadgeMap[feedback.status]}">${feedbackStatusMap[feedback.status]}</span>`;
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${feedback.id}</td>
+                            <td>${userInfo.realName || '未知用户'}</td>
+                            <td>${feedbackTypeMap[feedback.feedbackType] || '未知类型'}</td>
+                            <td>${feedback.title}</td>
+                            <td>${formatDate(feedback.createTime)}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="viewFeedbackDetail(${feedback.id})" data-bs-toggle="modal" data-bs-target="#viewFeedbackModal">查看详情</button>
+                                ${feedback.status === 0 ? 
+                                    `<button class="btn btn-sm btn-primary" onclick="handleFeedbackDirectly(${feedback.id})">快速处理</button>` : 
+                                    `<button class="btn btn-sm btn-primary" disabled>已处理</button>`}
+                            </td>
+                        </tr>
+                    `);
+                });
+
+                // 4. 加载统计
+                loadFeedbackStatistics();
+            } catch (err) {
+                console.error('加载反馈列表失败：', err);
+                alert('加载反馈列表失败，请稍后重试：' + err.message);
+                $('#feedbackTableBody').html(`
+                    <tr>
+                        <td colspan="7" class="text-center py-3 text-danger">加载失败，请稍后重试</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 8. 搜索反馈（Axios → Fetch改造）
+        async function searchFeedback() {
+            showLoading(true);
+            const userName = $('#searchFeedbackUser').val().trim();
+            const feedbackType = $('#searchFeedbackType').val();
+            const feedbackStatus = $('#searchFeedbackStatus').val();
+
+            try {
+                // 构建带参数的URL
+                let url = `${apiBaseUrl}/evaluation/getAllFeedback`;
+                const params = [];
+                if (userName) params.push(`userName=${encodeURIComponent(userName)}`);
+                if (feedbackType) params.push(`feedbackType=${encodeURIComponent(feedbackType)}`);
+                if (feedbackStatus) params.push(`status=${encodeURIComponent(feedbackStatus)}`);
+                if (params.length > 0) url += `?${params.join('&')}`;
+
+                // 1. 获取搜索结果
+                const feedbackResponse = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const feedbackRes = await feedbackResponse.json();
+                if (feedbackRes.code !== 200) {
+                    throw new Error(feedbackRes.msg || '搜索反馈失败');
+                }
+
+                const feedbacks = feedbackRes.data;
+                const tableBody = $('#feedbackTableBody');
+                tableBody.empty();
+
+                if (feedbacks.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="7" class="text-center py-3">未找到符合条件的反馈</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                // 2. 批量获取用户信息
+                const userIds = [...new Set(feedbacks.map(f => f.userId))];
+                const userResponse = await fetch(`${apiBaseUrl}/user/getUserByIds?ids=${encodeURIComponent(userIds.join(','))}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const userRes = await userResponse.json();
+                const userMap = userRes.code === 200 && userRes.data 
+                    ? userRes.data.reduce((map, u) => (map[u.id] = u, map), {}) 
+                    : {};
+
+                // 3. 渲染表格
+                feedbacks.forEach(feedback => {
+                    const userInfo = userMap[feedback.userId] || {};
+                    const statusBadge = `<span class="status-badge ${statusBadgeMap[feedback.status]}">${feedbackStatusMap[feedback.status]}</span>`;
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${feedback.id}</td>
+                            <td>${userInfo.realName || '未知用户'}</td>
+                            <td>${feedbackTypeMap[feedback.feedbackType] || '未知类型'}</td>
+                            <td>${feedback.title}</td>
+                            <td>${formatDate(feedback.createTime)}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="viewFeedbackDetail(${feedback.id})" data-bs-toggle="modal" data-bs-target="#viewFeedbackModal">查看详情</button>
+                                ${feedback.status === 0 ? 
+                                    `<button class="btn btn-sm btn-primary" onclick="handleFeedbackDirectly(${feedback.id})">快速处理</button>` : 
+                                    `<button class="btn btn-sm btn-primary" disabled>已处理</button>`}
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('搜索反馈失败：', err);
+                alert('搜索反馈失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 9. 查看反馈详情（Axios → Fetch改造）
+        async function viewFeedbackDetail(feedbackId) {
+            showLoading(true);
+            try {
+                // 1. 获取反馈详情
+                const feedbackResponse = await fetch(`${apiBaseUrl}/evaluation/getFeedbackById?id=${feedbackId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const feedbackRes = await feedbackResponse.json();
+                if (feedbackRes.code !== 200 || !feedbackRes.data) {
+                    throw new Error(feedbackRes.msg || '加载反馈详情失败');
+                }
+
+                const feedback = feedbackRes.data;
+
+                // 2. 获取用户信息
+                const userResponse = await fetch(`${apiBaseUrl}/user/getUserById?id=${feedback.userId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const userRes = await userResponse.json();
+                const userInfo = userRes.code === 200 && userRes.data ? userRes.data : {};
+
+                // 3. 填充详情数据
+                $('#currentFeedbackId').val(feedbackId);
+                $('#feedbackModalTitle').text(`反馈详情 - ${feedback.title}`);
+                $('#feedbackUserName').text(userInfo.realName || '未知用户');
+                $('#feedbackTypeText').text(feedbackTypeMap[feedback.feedbackType] || '未知类型');
+                $('#feedbackCreateTime').text(formatDate(feedback.createTime));
+                $('#feedbackStatusText').text(feedbackStatusMap[feedback.status]);
+                $('#feedbackUserPhone').text(userInfo.phone || '未提供');
+                $('#feedbackUserEmail').text(userInfo.email || '未提供');
+                $('#feedbackContent').text(feedback.content || '无详细内容');
+                $('#feedbackReply').val(feedback.reply || '');
+
+                // 4. 根据状态设置按钮文本
+                if (feedback.status === 1) {
+                    $('#handleFeedbackBtn').text('修改回复');
+                    $('#feedbackReply').attr('readonly', false);
+                } else {
+                    $('#handleFeedbackBtn').text('标记为已处理');
+                    $('#feedbackReply').attr('readonly', false);
+                }
+            } catch (err) {
+                console.error('查看反馈详情失败：', err);
+                alert('查看反馈详情失败，请稍后重试：' + err.message);
+                $('#feedbackContent').text('加载详情失败');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 10. 处理反馈（Axios → Fetch改造）
+        async function handleFeedback() {
+            showLoading(true);
+            const feedbackId = $('#currentFeedbackId').val();
+            const reply = $('#feedbackReply').val().trim();
+
+            if (!reply) {
+                alert('请输入处理回复内容');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/evaluation/handleFeedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: feedbackId,
+                        status: 1,
+                        reply: reply
+                    })
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('反馈处理成功');
+                    $('#viewFeedbackModal').modal('hide');
+                    loadFeedbackList();
+                } else {
+                    alert('反馈处理失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('反馈处理失败：', err);
+                alert('反馈处理失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 快速处理反馈（Axios → Fetch改造）
+        async function handleFeedbackDirectly(feedbackId) {
+            if (!confirm('确定要快速标记为已处理吗？将使用默认回复："您的反馈已收到，我们会尽快处理，感谢您的支持！"')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/evaluation/handleFeedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: feedbackId,
+                        status: 1,
+                        reply: '您的反馈已收到，我们会尽快处理，感谢您的支持！'
+                    })
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('反馈快速处理成功');
+                    loadFeedbackList();
+                } else {
+                    alert('反馈处理失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('反馈处理失败：', err);
+                alert('反馈处理失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 12. 批量标记已处理（Axios → Fetch改造）
+        async function batchHandleFeedback(status) {
+            const pendingCount = parseInt($('#pendingFeedbackCount').text());
+            if (pendingCount === 0) {
+                alert('暂无待处理的反馈');
+                return;
+            }
+
+            if (!confirm(`确定要将所有${pendingCount}条待处理反馈标记为已处理吗？`)) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/evaluation/batchHandleFeedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: 1,
+                        reply: '您的反馈已收到，我们会尽快处理，感谢您的支持！'
+                    })
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert(`成功处理${res.data || 0}条反馈`);
+                    loadFeedbackList();
+                } else {
+                    alert('批量处理失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('批量处理失败：', err);
+                alert('批量处理失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 14. 刷新列表（保留原逻辑）
+        function refreshFeedbackList() {
+            loadFeedbackList();
+        }
+
+        // 15. 页面加载时执行（保留原逻辑）
+        $(document).ready(loadFeedbackList);
+    </script>
+</body>
+</html>

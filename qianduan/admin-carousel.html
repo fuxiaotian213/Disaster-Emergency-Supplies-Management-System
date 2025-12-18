@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轮播图管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .img-preview { height: 150px; margin-top: 1rem; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; }
+        .img-preview img { max-height: 100%; max-width: 100%; }
+        .carousel-item-preview { height: 100px; overflow: hidden; }
+        .carousel-item-preview img { width: 100%; height: 100%; object-fit: cover; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏（统一路由链接格式） -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html" class="active">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="$admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>轮播图管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addCarouselModal">新增轮播图</button>
+                        <button class="btn btn-secondary" onclick="refreshCarouselList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>轮播图预览</th>
+                                        <th>标题</th>
+                                        <th>内容描述</th>
+                                        <th>排序</th>
+                                        <th>是否启用</th>
+                                        <th>发布部门</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="carouselTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增轮播图模态框 -->
+    <div class="modal fade" id="addCarouselModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增轮播图</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addCarouselForm">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="addCarouselTitle" class="form-label">标题 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addCarouselTitle" name="title" required placeholder="请输入轮播图标题">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addCarouselContent" class="form-label">内容描述</label>
+                                <textarea class="form-control" id="addCarouselContent" name="content" rows="3" placeholder="请输入轮播图内容描述（可选）"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addCarouselImage" class="form-label">上传轮播图 <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control" id="addCarouselImage" accept="image/*" required>
+                                <div class="img-preview" id="addCarouselImgPreview">
+                                    <span>图片预览</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addCarouselSort" class="form-label">排序 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="addCarouselSort" name="sort" required min="1" value="1" placeholder="数字越小越靠前">
+                                <div class="form-text">排序数字越小，轮播图展示顺序越靠前</div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">是否启用 <span class="text-danger">*</span></label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="enabled" id="addEnabledYes" value="1" checked>
+                                    <label class="form-check-label" for="addEnabledYes">启用</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="enabled" id="addEnabledNo" value="0">
+                                    <label class="form-check-label" for="addEnabledNo">禁用/label>
+                                </div>
+                            </div>
+                            <!-- 新增：发布部门字段 -->
+                            <div class="col-md-12">
+                                <label for="addCarouselDept" class="form-label">发布部门 <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <select class="form-select" id="addCarouselDept" name="publishDept" required>
+                                        <option value="">请选择常用部门</option>
+                                        <option value="深圳市应急管理局">深圳市应急管理局</option>
+                                        <option value="广东省应急管理厅">广东省应急管理厅</option>
+                                        <option value="XX市应急管理局">XX市应急管理局</option>
+                                        <option value="自定义">自定义部门</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="addCarouselDeptCustom" name="publishDeptCustom" placeholder="选择「自定义」时填写" disabled>
+                                </div>
+                                <div class="form-text">选择常用部门或自定义输入</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddCarousel()">确认新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑轮播图模态框 -->
+    <div class="modal fade" id="editCarouselModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑轮播图</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editCarouselForm">
+                        <input type="hidden" id="editCarouselId" name="id">
+                        <input type="hidden" id="editCarouselOldImage" name="oldImageUrl">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="editCarouselTitle" class="form-label">标题 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editCarouselTitle" name="title" required placeholder="请输入轮播图标题">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="editCarouselContent" class="form-label">内容描述</label>
+                                <textarea class="form-control" id="editCarouselContent" name="content" rows="3" placeholder="请输入轮播图内容描述（可选）"></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editCarouselImage" class="form-label">上传轮播图（不修改则不上传）</label>
+                                <input type="file" class="form-control" id="editCarouselImage" accept="image/*">
+                                <div class="img-preview" id="editCarouselImgPreview">
+                                    <span>图片预览</span>
+                                </div>
+                                <div class="mt-2" id="editCarouselOldImagePreview"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editCarouselSort" class="form-label">排序 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="editCarouselSort" name="sort" required min="1" placeholder="数字越小越靠前">
+                                <div class="form-text">排序数字越小，轮播图展示顺序越靠前</div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">是否启用 <span class="text-danger">*</span></label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="enabled" id="editEnabledYes" value="1">
+                                    <label class="form-check-label" for="editEnabledYes">启用</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="enabled" id="editEnabledNo" value="0">
+                                    <label class="form-check-label" for="editEnabledNo">禁用</label>
+                                </div>
+                            </div>
+                            <!-- 新增：发布部门字段 -->
+                            <div class="col-md-12">
+                                <label for="editCarouselDept" class="form-label">发布部门 <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <select class="form-select" id="editCarouselDept" name="publishDept" required>
+                                        <option value="">请选择常用部门</option>
+                                        <option value="深圳市应急管理局">深圳市应急管理局</option>
+                                        <option value="广东省应急管理厅">广东省应急管理厅</option>
+                                        <option value="XX市应急管理局">XX市应急管理局</option>
+                                        <option value="自定义">自定义部门</option>
+                                    </select>
+                                    <input type="text" class="form-control" id="editCarouselDeptCustom" name="publishDeptCustom" placeholder="选择「自定义」时填写" disabled>
+                                </div>
+                                <div class="form-text">选择常用部门或自定义输入</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitEditCarousel()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const basePath = ''; // 部署在根目录时留空，若部署在子目录（如 /admin）则改为 '/admin'
+        const apiBaseUrl = 'http://localhost:8080'; // 后端接口基础地址
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = `${basePath}login.html`;
+        }
+
+        // 4. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = `${basePath}login.html`;
+        }
+
+        // 5. 图片预览通用方法（保留原逻辑）
+        function previewImage(fileInputId, previewContainerId) {
+            const fileInput = document.getElementById(fileInputId);
+            const previewContainer = document.getElementById(previewContainerId);
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewContainer.innerHTML = `<img src="${e.target.result}" alt="预览图">`;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 6. 绑定图片预览事件（保留原逻辑）
+        $('#addCarouselImage').change(function() {
+            previewImage('addCarouselImage', 'addCarouselImgPreview');
+        });
+        $('#editCarouselImage').change(function() {
+            previewImage('editCarouselImage', 'editCarouselImgPreview');
+        });
+
+        // 7. 发布部门联动逻辑（新增）
+        // 新增轮播图 - 自定义部门联动
+        $('#addCarouselDept').change(function() {
+            const customInput = $('#addCarouselDeptCustom');
+            const isCustom = $(this).val() === '自定义';
+            customInput.prop('disabled', !isCustom);
+            if (!isCustom) {
+                customInput.val(''); // 非自定义时清空输入
+                customInput.prop('required', false);
+            } else {
+                customInput.prop('required', true); // 自定义时必输
+            }
+        });
+
+        // 编辑轮播图 - 自定义部门联动
+        $('#editCarouselDept').change(function() {
+            const customInput = $('#editCarouselDeptCustom');
+            const isCustom = $(this).val() === '自定义';
+            customInput.prop('disabled', !isCustom);
+            if (!isCustom) {
+                customInput.val('');
+                customInput.prop('required', false);
+            } else {
+                customInput.prop('required', true); // 自定义时必输
+            }
+        });
+
+        // 8. 加载轮播图列表（Axios → Fetch改造）
+        async function loadCarouselList() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/carousel/getAllCarousel`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '加载轮播图列表失败');
+                }
+
+                const carousels = res.data;
+                const tableBody = $('#carouselTableBody');
+                tableBody.empty();
+
+                carousels.forEach(carousel => {
+                    const enabledText = carousel.enabled === 1 ? '<span class="badge bg-success">启用</span>' : '<span class="badge bg-secondary">启用</span>';
+                    tableBody.append(`
+                        <tr>
+                            <td>${carousel.id}</td>
+                            <td>
+                                <div class="carousel-item-preview">
+                                    <img src="${carousel.imageUrl}" alt="${carousel.title}">
+                                </div>
+                            </td>
+                            <td>${carousel.title}</td>
+                            <td>${carousel.content || '-'}</td>
+                            <td>${carousel.sort}</td>
+                            <td>${enabledText}</td>
+                            <td>${carousel.publishDept || '-'}</td> <!-- 显示发布部门 -->
+                            <td>${formatDate(carousel.createTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="editCarousel(${carousel.id})" data-bs-toggle="modal" data-bs-target="#editCarouselModal">编辑</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteCarousel(${carousel.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('加载轮播图列表失败：', err);
+                alert('加载轮播图列表失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 9. 新增轮播图提交（Axios → Fetch改造 + 发布部门参数整合）
+        async function submitAddCarousel() {
+            const title = $('#addCarouselTitle').val().trim();
+            const content = $('#addCarouselContent').val().trim();
+            const sort = $('#addCarouselSort').val().trim();
+            const enabled = $('input[name="enabled"]:checked').val();
+            const imageInput = document.getElementById('addCarouselImage');
+            // 整合发布部门参数
+            const deptSelect = $('#addCarouselDept').val();
+            const deptCustom = $('#addCarouselDeptCustom').val().trim();
+            let publishDept = deptSelect;
+
+            // 校验必填项
+            if (!title || !sort || !imageInput.files[0] || !publishDept) {
+                alert('请填写必填字段并上传图片');
+                return;
+            }
+
+            // 处理自定义部门
+            if (deptSelect === '自定义') {
+                if (!deptCustom) {
+                    alert('请填写自定义发布部门');
+                    return;
+                }
+                publishDept = deptCustom;
+            }
+
+            // 图片转为Base64（保留原逻辑）
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                showLoading(true);
+                const imageUrl = e.target.result;
+
+                const carouselData = {
+                    title,
+                    content,
+                    sort,
+                    enabled: parseInt(enabled),
+                    imageUrl,
+                    publishDept: publishDept // 传递发布部门
+                };
+
+                try {
+                    const response = await fetch(`${apiBaseUrl}/carousel/addCarousel`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(carouselData)
+                    });
+
+                    const res = await response.json();
+                    if (res.code === 200) {
+                        alert('新增轮播图成功');
+                        $('#addCarouselModal').modal('hide');
+                        $('#addCarouselForm')[0].reset();
+                        $('#addCarouselImgPreview').html('<span>图片预览</span>');
+                        $('#addCarouselDeptCustom').val('').prop('disabled', true); // 重置自定义部门
+                        loadCarouselList();
+                    } else {
+                        alert('新增轮播图失败：' + (res.msg || '服务器内部错误'));
+                    }
+                } catch (err) {
+                    console.error('新增轮播图失败：', err);
+                    alert('新增轮播图失败，请稍后重试：' + err.message);
+                } finally {
+                    showLoading(false);
+                }
+            };
+            reader.readAsDataURL(imageInput.files[0]);
+        }
+
+        // 10. 编辑轮播图加载数据（Axios → Fetch改造 + 发布部门回显）
+        async function editCarousel(id) {
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/carousel/getCarouselById?id=${id}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '加载轮播图数据失败');
+                }
+
+                const carousel = res.data;
+                $('#editCarouselId').val(carousel.id);
+                $('#editCarouselOldImage').val(carousel.imageUrl);
+                $('#editCarouselTitle').val(carousel.title);
+                $('#editCarouselContent').val(carousel.content || '');
+                $('#editCarouselSort').val(carousel.sort);
+                $('#editCarouselImgPreview').html('<span>图片预览</span>');
+                $('#editCarouselOldImagePreview').html(`
+                    <p>当前图片：</p>
+                    <div class="carousel-item-preview">
+                        <img src="${carousel.imageUrl}" alt="${carousel.title}">
+                    </div>
+                `);
+
+                // 选中启用状态（保留原逻辑）
+                if (carousel.enabled === 1) {
+                    $('#editEnabledYes').prop('checked', true);
+                } else {
+                    $('#editEnabledNo').prop('checked', true);
+                }
+
+                // 回显发布部门（新增）
+                const publishDept = carousel.publishDept || '';
+                const deptSelect = $('#editCarouselDept');
+                const deptCustom = $('#editCarouselDeptCustom');
+                // 匹配常用部门则选中，否则选中自定义并回显
+                if (['深圳市应急管理局', '广东省应急管理厅', 'XX市应急管理局'].includes(publishDept)) {
+                    deptSelect.val(publishDept);
+                    deptCustom.prop('disabled', true).val('').prop('required', false);
+                } else {
+                    deptSelect.val('自定义');
+                    deptCustom.prop('disabled', false).val(publishDept).prop('required', true);
+                }
+            } catch (err) {
+                console.error('加载轮播图数据失败：', err);
+                alert('加载轮播图数据失败，请稍后重试：' + err.message);
+                $('#editCarouselModal').modal('hide');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 提交编辑轮播图（Axios → Fetch改造 + 发布部门参数整合）
+        async function submitEditCarousel() {
+            const id = $('#editCarouselId').val();
+            const title = $('#editCarouselTitle').val().trim();
+            const content = $('#editCarouselContent').val().trim();
+            const sort = $('#editCarouselSort').val().trim();
+            const enabled = $('input[name="enabled"]:checked').val();
+            const oldImageUrl = $('#editCarouselOldImage').val();
+            const imageInput = document.getElementById('editCarouselImage');
+            // 整合发布部门参数
+            const deptSelect = $('#editCarouselDept').val();
+            const deptCustom = $('#editCarouselDeptCustom').val().trim();
+            let publishDept = deptSelect;
+
+            // 校验必填项
+            if (!title || !sort || !publishDept) {
+                alert('请填写必填字段');
+                return;
+            }
+
+            // 处理自定义部门
+            if (deptSelect === '自定义') {
+                if (!deptCustom) {
+                    alert('请填写自定义发布部门');
+                    return;
+                }
+                publishDept = deptCustom;
+            }
+
+            const carouselData = {
+                id,
+                title,
+                content,
+                sort,
+                enabled,
+                imageUrl: oldImageUrl,
+                publishDept: publishDept // 传递发布部门
+            };
+
+            // 处理新上传图片（保留原逻辑）
+            if (imageInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    carouselData.imageUrl = e.target.result;
+                    await submitEditRequest(carouselData);
+                };
+                reader.readAsDataURL(imageInput.files[0]);
+            } else {
+                await submitEditRequest(carouselData);
+            }
+        }
+
+        // 12. 编辑请求提交（新增，拆分逻辑）
+       async function submitEditRequest(carouselData) {
+    // 核心1：从传入的 carouselData 中获取已有参数
+    const { id, title, content, sort, enabled, publishDept } = carouselData;
+    
+    // 核心2：适配常见的图片预览ID（如果下面的ID都不对，直接修改成你页面中的实际ID）
+    let oldImageUrl = '';
+    // 常见预览图ID列表（按优先级查找，找到第一个存在的）
+    const previewIds = ['editImg', 'previewImg', 'carouselPreview', 'editCarouselImg', 'imagePreview'];
+    let targetPreviewElement = null;
+
+    // 遍历查找存在的预览元素
+    for (const id of previewIds) {
+        const elem = document.getElementById(id);
+        if (elem) {
+            targetPreviewElement = elem;
+            break;
+        }
+    }
+
+    // 若还是没找到，手动提示你输入正确ID
+    if (!targetPreviewElement) {
+        const customId = prompt('未找到图片预览元素，请输入你页面中图片预览的ID（比如 editImg）：');
+        if (!customId) {
+            alert('未输入ID，修改失败');
+            showLoading(false);
+            return;
+        }
+        targetPreviewElement = document.getElementById(customId);
+        if (!targetPreviewElement) {
+            alert(`输入的ID "${customId}" 也不存在，请检查页面代码`);
+            showLoading(false);
+            return;
+        }
+    }
+
+    // 获取正确的旧图片地址
+    oldImageUrl = targetPreviewElement.src;
+    // 过滤无效地址（比如默认占位图）
+    if (oldImageUrl.includes('placeholder') || oldImageUrl.includes('default') || oldImageUrl === '') {
+        alert('旧图片地址无效，请确保轮播图已上传图片');
+        showLoading(false);
+        return;
+    }
+
+    // 核心3：构造提交数据（格式正确，无重复字段）
+    const submitData = {
+        id,
+        title,
+        content,
+        sort: parseInt(sort) || 0, // 排序默认为0，避免NaN
+        enabled: parseInt(enabled) || 0, // 状态默认为禁用，避免NaN
+        publishDept,
+        oldImageUrl: oldImageUrl
+    };
+
+    showLoading(true);
+    try {
+        console.log('提交的编辑数据：', submitData); // 调试用，可删除
+
+        const response = await fetch(`${apiBaseUrl}/carousel/updateCarousel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(submitData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`服务器响应错误：${response.status}`);
+        }
+
+        const res = await response.json();
+        if (res.code === 200) {
+            alert('修改轮播图成功');
+            $('#editCarouselModal').modal('hide');
+            $('#editCarouselForm')[0].reset();
+            $('#editCarouselDeptCustom').val('').prop('disabled', true);
+            loadCarouselList();
+        } else {
+            alert('修改轮播图失败：' + (res.msg || '服务器返回错误'));
+        }
+    } catch (err) {
+        console.error('修改失败详情：', err);
+        alert('修改轮播图失败：' + err.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+        // 13. 删除轮播图（Axios → Fetch改造）
+        async function deleteCarousel(id) {
+    if (!confirm('确定要删除该轮播图吗？删除后不可恢复')) {
+        return;
+    }
+
+    showLoading(true);
+    try {
+        const response = await fetch(`${apiBaseUrl}/carousel/deleteCarousel?id=${id}`, {
+            method: 'DELETE', // 新增：设置正确的请求方式
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const res = await response.json();
+        if (res.code === 200) {
+            alert('删除轮播图成功');
+            loadCarouselList();
+        } else {
+            alert('删除轮播图失败：' + (res.msg || '服务器内部错误'));
+        }
+    } catch (err) {
+        console.error('删除轮播图失败：', err);
+        alert('删除轮播图失败，请稍后重试：' + err.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+        // 14. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 15. 刷新列表（保留原逻辑）
+        function refreshCarouselList() {
+            loadCarouselList();
+        }
+
+        // 16. 页面加载执行（保留原逻辑）
+        $(document).ready(loadCarouselList);
+    </script>
+</body>
+</html>

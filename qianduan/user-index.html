@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户首页 - 灾害应急物资调度系统</title>
+    <!-- 引入外部资源 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        /* 全局样式重置与基础设置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* 导航栏美化 */
+        .navbar {
+            background: linear-gradient(135deg, #165DFF 0%, #0F48C9 100%) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 0.8rem 0;
+        }
+        .navbar-brand {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .navbar-brand i {
+            font-size: 1.6rem;
+        }
+        .nav-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+            margin: 0 0.5rem;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #fff !important;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: #fff;
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after, .nav-link.active::after {
+            width: 100%;
+        }
+        .navbar-text {
+            color: #fff !important;
+            font-weight: 500;
+        }
+        .btn-light {
+            background-color: #fff;
+            color: #165DFF !important;
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-light:hover {
+            background-color: #f0f7ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(22, 93, 255, 0.2);
+        }
+
+        /* 轮播图美化 */
+        .carousel {
+            margin-bottom: 3rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+        }
+        .carousel-item {
+            height: 420px;
+            position: relative;
+        }
+        .carousel-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.4));
+            z-index: 1;
+        }
+        .carousel-item img {
+            object-fit: cover;
+            height: 100%;
+            transition: transform 8s ease;
+        }
+        .carousel-item:hover img {
+            transform: scale(1.05);
+        }
+        .carousel-caption {
+            z-index: 2;
+            bottom: 3rem !important;
+            left: 5% !important;
+            right: 5% !important;
+            padding: 1.5rem;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.6) !important;
+            backdrop-filter: blur(5px);
+        }
+        .carousel-caption h5 {
+            font-size: 1.6rem;
+            margin-bottom: 0.8rem;
+            color: #fff;
+            font-weight: 600;
+        }
+        .carousel-caption p {
+            font-size: 1.1rem;
+            color: #f0f0f0;
+            line-height: 1.6;
+        }
+        .carousel-indicators [data-bs-target] {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 8px;
+            background-color: #fff;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+        .carousel-indicators .active {
+            opacity: 1;
+            width: 36px;
+            border-radius: 6px;
+        }
+        .carousel-control-prev, .carousel-control-next {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin: 0 1rem;
+            transition: all 0.3s ease;
+        }
+        .carousel-control-prev:hover, .carousel-control-next:hover {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+        .carousel-control-prev-icon, .carousel-control-next-icon {
+            width: 30px;
+            height: 30px;
+        }
+
+        /* 功能卡片美化 */
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.5s ease;
+            background-color: #fff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(22, 93, 255, 0.15);
+        }
+        .card-body {
+            padding: 2rem;
+        }
+        .card-title {
+            font-size: 1.5rem;
+            color: #165DFF;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .card-title i {
+            font-size: 1.8rem;
+        }
+        .card-text {
+            font-size: 1.05rem;
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+        .btn-primary, .btn-success, .btn-info {
+            padding: 0.8rem 2rem;
+            font-size: 1.05rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #165DFF;
+        }
+        .btn-primary:hover {
+            background-color: #0F48C9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(22, 93, 255, 0.3);
+        }
+        .btn-success {
+            background-color: #36D399;
+        }
+        .btn-success:hover {
+            background-color: #2DB987;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(54, 211, 153, 0.3);
+        }
+        .btn-info {
+            background-color: #3ABFF8;
+        }
+        .btn-info:hover {
+            background-color: #2AA7E0;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(58, 191, 248, 0.3);
+        }
+
+        /* 加载动画优化 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(3px);
+            transition: opacity 0.3s ease;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e0e7ff;
+            border-top: 5px solid #165DFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* AI对话功能样式 */
+        .ai-chat-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 9998;
+        }
+        .chat-toggle-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #165DFF 0%, #0F48C9 100%);
+            color: #fff;
+            border: none;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(22, 93, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .chat-toggle-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(22, 93, 255, 0.4);
+        }
+        .chat-window {
+            width: 380px;
+            height: 520px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .chat-header {
+            background: linear-gradient(135deg, #165DFF 0%, #0F48C9 100%);
+            color: #fff;
+            padding: 1rem 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .chat-header h5 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chat-close-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .chat-close-btn:hover {
+            color: #f0f0f0;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 1.2rem;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background-color: #ddd;
+            border-radius: 3px;
+        }
+        .message {
+            margin-bottom: 1.2rem;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .ai-message {
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        .user-message {
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .message-content {
+            padding: 0.8rem 1.2rem;
+            border-radius: 18px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+        .ai-message .message-content {
+            background-color: #e0e7ff;
+            color: #165DFF;
+            border-top-left-radius: 4px;
+        }
+        .user-message .message-content {
+            background-color: #165DFF;
+            color: #fff;
+            border-top-right-radius: 4px;
+        }
+        .chat-input-container {
+            padding: 1rem;
+            border-top: 1px solid #eee;
+            background-color: #fff;
+        }
+        .chat-input-group {
+            display: flex;
+            gap: 0.8rem;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 0.9rem 1.2rem;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+        .chat-input:focus {
+            outline: none;
+            border-color: #165DFF;
+            box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.1);
+        }
+        .chat-send-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: #165DFF;
+            color: #fff;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .chat-send-btn:hover {
+            background-color: #0F48C9;
+            transform: rotate(15deg);
+        }
+        .chat-send-btn i {
+            font-size: 1.2rem;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 992px) {
+            .carousel-item {
+                height: 350px;
+            }
+            .carousel-caption h5 {
+                font-size: 1.4rem;
+            }
+            .carousel-caption p {
+                font-size: 1rem;
+            }
+            .card-title {
+                font-size: 1.3rem;
+            }
+        }
+        @media (max-width: 768px) {
+            .carousel-item {
+                height: 280px;
+            }
+            .carousel-caption {
+                bottom: 1.5rem !important;
+                padding: 1rem;
+            }
+            .carousel-caption h5 {
+                font-size: 1.2rem;
+                margin-bottom: 0.5rem;
+            }
+            .carousel-caption p {
+                font-size: 0.9rem;
+            }
+            .card {
+                margin-bottom: 1.5rem;
+            }
+            .chat-window {
+                width: calc(100% - 2rem);
+                height: 450px;
+            }
+        }
+        @media (max-width: 576px) {
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+            .carousel-item {
+                height: 220px;
+            }
+            .carousel-control-prev, .carousel-control-next {
+                width: 40px;
+                height: 40px;
+            }
+            .carousel-control-prev-icon, .carousel-control-next-icon {
+                width: 20px;
+                height: 20px;
+            }
+            .card-body {
+                padding: 1.5rem;
+            }
+            .btn-primary, .btn-success, .btn-info {
+                padding: 0.7rem 1.5rem;
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="user-index.html">
+                <i class="bi bi-shield-heart"></i>
+                应急物资调度系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#userNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="userNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link active" href="user-index.html"><i class="bi bi-house-fill"></i> 首页</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-disaster-report.html"><i class="bi bi-exclamation-triangle-fill"></i> 灾情上报</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-material-apply.html"><i class="bi bi-box-seam-fill"></i> 物资申请</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-order-query.html"><i class="bi bi-clock-fill"></i> 申请进度</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-evaluation.html"><i class="bi bi-chat-square-text-fill"></i> 评价反馈</a></li>
+                </ul>
+                <span class="navbar-text me-3" id="userInfo"></span>
+                <button class="btn btn-light" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> 退出登录
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 轮播图（公告） -->
+    <div id="noticeCarousel" class="carousel slide" data-bs-ride="carousel">
+        <div class="carousel-indicators" id="carouselIndicators"></div>
+        <div class="carousel-inner" id="carouselInner"></div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#noticeCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">上一张</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#noticeCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">下一张</span>
+        </button>
+    </div>
+
+    <!-- 功能卡片 -->
+    <div class="container mt-5 mb-8">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-exclamation-triangle-fill"></i> 灾情上报
+                        </h5>
+                        <p class="card-text">快速上报灾情信息，上传现场图片，详细描述受灾情况，等待政府部门审核响应</p>
+                        <a href="user-disaster-report.html" class="btn btn-primary">立即上报</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-box-seam-fill"></i> 物资申请
+                        </h5>
+                        <p class="card-text">根据已审核通过的灾情记录，申请所需救援物资，系统自动匹配优先级和储备情况</p>
+                        <a href="user-material-apply.html" class="btn btn-success">申请物资</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">
+                            <i class="bi bi-clock-fill"></i> 申请进度
+                        </h5>
+                        <p class="card-text">实时查询订单处理状态、物资运输轨迹及最终签收信息，全程透明可追溯</p>
+                        <a href="user-order-query.html" class="btn btn-info">查询进度</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI对话功能 -->
+    <div class="ai-chat-container">
+        <!-- 聊天触发按钮 -->
+        <button class="chat-toggle-btn" id="chatToggleBtn">
+            <i class="bi bi-robot"></i>
+        </button>
+        <!-- 聊天窗口 -->
+        <div class="chat-window" id="chatWindow">
+            <div class="chat-header">
+                <h5><i class="bi bi-robot"></i> 应急助手</h5>
+                <button class="chat-close-btn" id="chatCloseBtn">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <!-- 初始欢迎消息 -->
+                <div class="message ai-message">
+                    <div class="message-content">
+                        你好！我是应急助手，有什么可以帮你的？<br>
+                        例如：<br>
+                        1. 如何上报灾情？<br>
+                        2. 物资申请需要什么条件？<br>
+                        3. 怎么查询申请进度？
+                    </div>
+                </div>
+            </div>
+            <div class="chat-input-container">
+                <div class="chat-input-group">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="请输入你的问题...">
+                    <button class="chat-send-btn" id="chatSendBtn">
+                        <i class="bi bi-paper-plane-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态
+        const user = JSON.parse(localStorage.getItem('user')) || { realName: '游客', roleId: 3 };
+        if (!user || user.roleId !== 3) {
+            window.location.href = 'login.html';
+        }
+
+            // 4. 显示用户信息（保留原逻辑）
+        $('#userInfo').text(`欢迎，${user.realName}`);
+
+        // 5. 退出登录
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 发送GET请求的工具函数
+        async function fetchGet(url) {
+            try {
+                console.log(`发送请求到：${url}`);
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                console.log(`响应状态：${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP错误！状态码：${response.status}`);
+                }
+                const res = await response.json();
+                console.log(`响应数据：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                alert(`网络错误：${err.message}，请检查后端服务是否启动、接口地址是否正确`);
+                throw err;
+            }
+        }
+
+        // 7. 加载轮播图（公告）
+        async function loadCarousel() {
+            showLoading(true);
+            try {
+                console.log(`加载轮播图，调用接口：${apiBaseUrl}/carousel/getEnabledList`);
+                const carousels = await fetchGet(`${apiBaseUrl}/carousel/getEnabledList`);
+                console.log(`轮播图数据：`, carousels);
+                const indicators = $('#carouselIndicators');
+                const inner = $('#carouselInner');
+
+                indicators.empty();
+                inner.empty();
+
+                if (carousels.length === 0) {
+                    const defaultItem = $(`
+                        <div class="carousel-item active">
+                            <img src="https://picsum.photos/id/1033/1200/400" class="d-block w-100" alt="默认公告">
+                            <div class="carousel-caption d-none d-md-block">
+                                <h5>暂无公告</h5>
+                                <p>当前没有最新公告信息</p>
+                            </div>
+                        </div>
+                    `);
+                    inner.append(defaultItem);
+                    showLoading(false);
+                    return;
+                }
+
+                carousels.forEach((item, index) => {
+                    // 轮播指示器
+                    const indicator = $(`<button type="button" data-bs-target="#noticeCarousel" data-bs-slide-to="${index}" ${index === 0 ? 'class="active" aria-current="true"' : ''} aria-label="Slide ${index + 1}"></button>`);
+                    indicators.append(indicator);
+
+                    // 轮播项
+                    const carouselItem = $(`
+                        <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                            <img src="${item.imageUrl || 'https://picsum.photos/id/1033/1200/400'}" class="d-block w-100" alt="${item.title}">
+                            <div class="carousel-caption d-none d-md-block">
+                                <h5>${item.title}</h5>
+                                <p>${item.content || '无详细说明'}</p>
+                            </div>
+                        </div>
+                    `);
+                    inner.append(carouselItem);
+                });
+            } catch (err) {
+                console.error('加载公告失败：', err);
+                alert('公告加载失败，请稍后重试：' + err.message);
+                
+                const errorItem = $(`
+                    <div class="carousel-item active">
+                        <img src="https://picsum.photos/id/1033/1200/400" class="d-block w-100" alt="加载失败">
+                        <div class="carousel-caption d-none d-md-block">
+                            <h5>公告加载失败</h5>
+                            <p>请刷新页面重试或联系管理员</p>
+                        </div>
+                    </div>
+                `);
+                $('#carouselInner').empty().append(errorItem);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 8. AI对话功能实现
+        function initAIChat() {
+            const chatToggleBtn = document.getElementById('chatToggleBtn');
+            const chatWindow = document.getElementById('chatWindow');
+            const chatCloseBtn = document.getElementById('chatCloseBtn');
+            const chatInput = document.getElementById('chatInput');
+            const chatSendBtn = document.getElementById('chatSendBtn');
+            const chatMessages = document.getElementById('chatMessages');
+
+            // 常见问题答案库（可扩展）
+            const faqAnswers = {
+                '如何上报灾情': '1. 点击首页"灾情上报"按钮；<br>2. 填写灾情地点、类型、受灾情况等信息；<br>3. 上传现场图片（可选）；<br>4. 提交后等待政府部门审核。',
+                '上报灾情需要什么材料': '需要提供灾情发生的具体地点、时间、灾情类型（如洪水、地震等）、受灾范围和程度描述，建议上传现场图片辅助审核。',
+                '物资申请需要什么条件': '需先完成灾情上报并通过审核，审核通过后可根据受灾情况申请对应物资，系统会根据物资储备情况和申请优先级进行分配。',
+                '怎么查询申请进度': '点击首页"申请进度"按钮，输入订单编号或手机号即可查询，也可直接在个人中心查看所有申请记录的实时状态。',
+                '申请物资多久能到': '一般情况下，审核通过后24-48小时内会安排物资配送，紧急灾情会优先处理，具体时间可在申请进度中查看运输轨迹。',
+                '可以申请哪些物资': '可申请的物资包括：饮用水、食品、帐篷、被褥、急救药品、手电筒、救生衣等应急救援物资，具体以系统显示的可申请列表为准。',
+                '忘记密码怎么办': '点击登录页面的"忘记密码"链接，输入注册手机号获取验证码，验证后即可重置密码。',
+                '如何反馈意见': '点击首页"评价反馈"按钮，填写你的意见或建议并提交，我们会及时处理并回复。'
+            };
+
+            // 切换聊天窗口显示/隐藏
+            chatToggleBtn.addEventListener('click', () => {
+                chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+            });
+
+            // 关闭聊天窗口
+            chatCloseBtn.addEventListener('click', () => {
+                chatWindow.style.display = 'none';
+            });
+
+            // 发送消息
+            function sendMessage() {
+                const messageText = chatInput.value.trim();
+                if (!messageText) return;
+
+                // 添加用户消息到聊天窗口
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user-message';
+                userMessage.innerHTML = `<div class="message-content">${messageText}</div>`;
+                chatMessages.appendChild(userMessage);
+
+                // 清空输入框
+                chatInput.value = '';
+
+                // 滚动到底部
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // AI回复（模拟延迟，更真实）
+                setTimeout(() => {
+                    let aiReply = '抱歉，我暂时无法回答这个问题，请尝试询问其他相关问题，或联系管理员获取帮助。';
+                    
+                    // 匹配常见问题
+                    for (const [question, answer] of Object.entries(faqAnswers)) {
+                        if (messageText.includes(question)) {
+                            aiReply = answer;
+                            break;
+                        }
+                    }
+
+                    // 添加AI回复到聊天窗口
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'message ai-message';
+                    aiMessage.innerHTML = `<div class="message-content">${aiReply}</div>`;
+                    chatMessages.appendChild(aiMessage);
+
+                    // 滚动到底部
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 800);
+            }
+
+            // 点击发送按钮
+            chatSendBtn.addEventListener('click', sendMessage);
+
+            // 按回车发送
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+
+        // 9. 页面加载时执行
+        $(document).ready(() => {
+            loadCarousel();
+            initAIChat();
+        });
+    </script>
+</body>
+</html>

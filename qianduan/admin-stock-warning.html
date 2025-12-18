@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>库存预警 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        .warning-badge { background-color: #ffc107; color: #212529; padding: 0.3rem 0.6rem; border-radius: 0.3rem; }
+        .danger-badge { background-color: #dc3545; color: white; padding: 0.3rem 0.6rem; border-radius: 0.3rem; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html" class="active">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>库存预警管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#setWarningThresholdModal">设置预警阈值</button>
+                        <button class="btn btn-secondary" onclick="refreshWarningList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 预警统计卡片 -->
+                <div class="row mb-4">
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card bg-warning/10 border-warning shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-warning">一般预警</h5>
+                                <h2 class="card-text" id="normalWarningCount">0</h2>
+                                <p class="card-text text-sm">库存低于预警阈值但仍可满足基本需求</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card bg-danger/10 border-danger shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-danger">紧急预警</h5>
+                                <h2 class="card-text" id="urgentWarningCount">0</h2>
+                                <p class="card-text text-sm">库存严重不足，需立即补充</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card bg-info/10 border-info shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-info">预警物资类型</h5>
+                                <h2 class="card-text" id="warningMaterialTypeCount">0</h2>
+                                <p class="card-text text-sm">涉及预警的物资类型数量</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card bg-primary/10 border-primary shadow">
+                            <div class="card-body">
+                                <h5 class="card-title text-primary">涉及储备点</h5>
+                                <h2 class="card-text" id="warningPointCount">0</h2>
+                                <p class="card-text text-sm">存在库存预警的储备点数量</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜索栏 -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" id="searchWarningMaterialName" placeholder="搜索物资名称">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchWarningMaterialType">
+                                    <option value="">所有类型</option>
+                                    <option value="1">帐篷</option>
+                                    <option value="2">食品</option>
+                                    <option value="3">药品</option>
+                                    <option value="4">工具</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchWarningLevel">
+                                    <option value="">所有预警等级</option>
+                                    <option value="1">一般预警</option>
+                                    <option value="2">紧急预警</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-info w-100" onclick="searchWarning()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 预警列表表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>物资名称</th>
+                                        <th>物资类型</th>
+                                        <th>储备点</th>
+                                        <th>当前库存</th>
+                                        <th>预警阈值</th>
+                                        <th>预警等级</th>
+                                        <th>优先级</th>
+                                        <th>最后更新时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="warningTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置预警阈值模态框 -->
+    <div class="modal fade" id="setWarningThresholdModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">设置库存预警阈值</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="thresholdForm">
+                        <div class="mb-3">
+                            <label class="form-label">默认预警阈值（适用于所有未单独设置的物资）</label>
+                            <input type="number" class="form-control" id="defaultThreshold" min="1" placeholder="请输入默认预警阈值">
+                            <div class="form-text">当物资库存低于该值时，将触发一般预警</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">紧急预警比例（%）</label>
+                            <input type="number" class="form-control" id="urgentRatio" min="1" max="99" placeholder="例如：30（表示库存低于阈值的30%时触发紧急预警）">
+                            <div class="form-text">例如：阈值为100，比例为30，则库存低于30时触发紧急预警</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">按物资类型单独设置阈值（可选）</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <select class="form-select" id="materialTypeSelect">
+                                        <option value="">选择物资类型</option>
+                                        <option value="1">帐篷</option>
+                                        <option value="2">食品</option>
+                                        <option value="3">药品</option>
+                                        <option value="4">工具</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="number" class="form-control" id="typeThreshold" min="1" placeholder="该类型物资的预警阈值">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitThresholdSetting()">保存设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 补充库存模态框 -->
+    <div class="modal fade" id="replenishStockModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="replenishModalTitle">补充库存</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="replenishStockForm">
+                        <input type="hidden" id="replenishMaterialId">
+                        <div class="mb-3">
+                            <label for="currentStock" class="form-label">当前库存</label>
+                            <input type="text" class="form-control" id="currentStock" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="replenishNum" class="form-label">补充数量 <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="replenishNum" min="1" required placeholder="请输入补充的物资数量">
+                        </div>
+                        <div class="mb-3">
+                            <label for="replenishRemark" class="form-label">补充备注</label>
+                            <textarea class="form-control" id="replenishRemark" rows="3" placeholder="请输入补充说明（如：采购入库、调运入库等）"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitReplenishStock()">确认补充</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 数据映射（保留原逻辑）
+        const materialTypeMap = {1: '帐篷', 2: '食品', 3: '药品', 4: '工具'};
+        const priorityMap = {1: '高（紧急）', 2: '中（常规）', 3: '低（备用）'};
+        const warningLevelMap = {1: '一般预警', 2: '紧急预警'};
+
+        // 5. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 发送GET请求的工具函数（新增）
+        async function fetchGet(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 7. 发送POST请求的工具函数（新增）
+        async function fetchPost(url, data) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 8. 获取预警阈值设置（Axios → Fetch改造）
+        async function getThresholdSetting() {
+            try {
+                const setting = await fetchGet(`${apiBaseUrl}/stockWarning/getThresholdSetting`);
+                // 填充到模态框（保留原逻辑）
+                $('#defaultThreshold').val(setting.defaultThreshold || 50);
+                $('#urgentRatio').val(setting.urgentRatio || 30);
+                return {
+                    defaultThreshold: setting.defaultThreshold || 50,
+                    urgentRatio: setting.urgentRatio || 30,
+                    typeThresholds: setting.typeThresholds || {}
+                };
+            } catch (err) {
+                console.error('获取预警阈值失败：', err);
+                alert('获取预警阈值失败，使用默认设置');
+                // 返回默认设置（保留原逻辑）
+                $('#defaultThreshold').val(50);
+                $('#urgentRatio').val(30);
+                return {
+                    defaultThreshold: 50,
+                    urgentRatio: 30,
+                    typeThresholds: {}
+                };
+            }
+        }
+
+        // 9. 计算预警等级（保留原逻辑）
+        function calculateWarningLevel(stockNum, threshold, urgentRatio) {
+            const urgentThreshold = threshold * (urgentRatio / 100);
+            if (stockNum <= urgentThreshold) {
+                return 2; // 紧急预警
+            } else if (stockNum < threshold) {
+                return 1; // 一般预警
+            }
+            return 0; // 无预警
+        }
+
+        // 10. 加载库存预警列表（Axios → Fetch改造）
+        async function loadWarningList() {
+            showLoading(true);
+            try {
+                const thresholdSetting = await getThresholdSetting();
+                // 获取物资列表
+                const materials = await fetchGet(`${apiBaseUrl}/material/getMaterialList`);
+                // 获取储备点信息
+                const points = await fetchGet(`${apiBaseUrl}/reservePoint/getAllReservePoint`);
+                const pointsMap = points.reduce((map, p) => (map[p.id] = p.pointName, map), {});
+
+                // 筛选有预警的物资（保留原逻辑）
+                const warningMaterials = materials.filter(material => {
+                    const threshold = thresholdSetting.typeThresholds[material.materialType] || thresholdSetting.defaultThreshold;
+                    return material.stockNum < threshold;
+                });
+
+                // 计算预警统计（保留原逻辑）
+                const normalWarningCount = warningMaterials.filter(m => 
+                    calculateWarningLevel(m.stockNum, 
+                        thresholdSetting.typeThresholds[m.materialType] || thresholdSetting.defaultThreshold,
+                        thresholdSetting.urgentRatio) === 1
+                ).length;
+                const urgentWarningCount = warningMaterials.length - normalWarningCount;
+                const warningMaterialTypes = [...new Set(warningMaterials.map(m => m.materialType))].length;
+                const warningPoints = [...new Set(warningMaterials.map(m => m.reservePointId))].length;
+
+                // 更新统计卡片（保留原逻辑）
+                $('#normalWarningCount').text(normalWarningCount);
+                $('#urgentWarningCount').text(urgentWarningCount);
+                $('#warningMaterialTypeCount').text(warningMaterialTypes);
+                $('#warningPointCount').text(warningPoints);
+
+                // 渲染表格（保留原逻辑）
+                const tableBody = $('#warningTableBody');
+                tableBody.empty();
+
+                if (warningMaterials.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="10" class="text-center py-3">暂无库存预警物资</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                warningMaterials.forEach(material => {
+                    const threshold = thresholdSetting.typeThresholds[material.materialType] || thresholdSetting.defaultThreshold;
+                    const warningLevel = calculateWarningLevel(material.stockNum, threshold, thresholdSetting.urgentRatio);
+                    const levelBadge = warningLevel === 1 ? 
+                        `<span class="warning-badge">${warningLevelMap[warningLevel]}</span>` : 
+                        `<span class="danger-badge">${warningLevelMap[warningLevel]}</span>`;
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${material.id}</td>
+                            <td>${material.materialName}</td>
+                            <td>${materialTypeMap[material.materialType]}</td>
+                            <td>${pointsMap[material.reservePointId] || '-'}</td>
+                            <td>${material.stockNum}</td>
+                            <td>${threshold}</td>
+                            <td>${levelBadge}</td>
+                            <td>${priorityMap[material.priorityLevel]}</td>
+                            <td>${formatDate(material.updateTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary me-2" onclick="showReplenishModal(${material.id}, ${material.stockNum})" data-bs-toggle="modal" data-bs-target="#replenishStockModal">补充库存</button>
+                                <button class="btn btn-sm btn-info" onclick="viewMaterialDetail(${material.id})">查看详情</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('加载库存预警列表失败：', err);
+                alert('加载库存预警列表失败，请稍后重试：' + err.message);
+                $('#warningTableBody').html(`
+                    <tr>
+                        <td colspan="10" class="text-center py-3 text-danger">加载失败，请稍后重试</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 搜索库存预警（Axios → Fetch改造）
+        async function searchWarning() {
+            showLoading(true);
+            const materialName = $('#searchWarningMaterialName').val().trim();
+            const materialType = $('#searchWarningMaterialType').val();
+            const warningLevel = $('#searchWarningLevel').val();
+            const thresholdSetting = await getThresholdSetting();
+
+            try {
+                // 获取物资列表和储备点信息
+                const [materials, points] = await Promise.all([
+                    fetchGet(`${apiBaseUrl}/material/getMaterialList`),
+                    fetchGet(`${apiBaseUrl}/reservePoint/getAllReservePoint`)
+                ]);
+                const pointsMap = points.reduce((map, p) => (map[p.id] = p.pointName, map), {});
+
+                // 筛选条件（保留原逻辑）
+                let filteredMaterials = materials.filter(material => {
+                    const threshold = thresholdSetting.typeThresholds[material.materialType] || thresholdSetting.defaultThreshold;
+                    const hasWarning = material.stockNum < threshold;
+                    const nameMatch = materialName ? material.materialName.includes(materialName) : true;
+                    const typeMatch = materialType ? material.materialType == materialType : true;
+                    
+                    // 预警等级匹配
+                    let levelMatch = true;
+                    if (warningLevel) {
+                        const level = calculateWarningLevel(material.stockNum, threshold, thresholdSetting.urgentRatio);
+                        levelMatch = level == warningLevel;
+                    }
+
+                    return hasWarning && nameMatch && typeMatch && levelMatch;
+                });
+
+                // 渲染表格（保留原逻辑）
+                const tableBody = $('#warningTableBody');
+                tableBody.empty();
+
+                if (filteredMaterials.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="10" class="text-center py-3">未找到符合条件的库存预警物资</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                filteredMaterials.forEach(material => {
+                    const threshold = thresholdSetting.typeThresholds[material.materialType] || thresholdSetting.defaultThreshold;
+                    const level = calculateWarningLevel(material.stockNum, threshold, thresholdSetting.urgentRatio);
+                    const levelBadge = level === 1 ? 
+                        `<span class="warning-badge">${warningLevelMap[level]}</span>` : 
+                        `<span class="danger-badge">${warningLevelMap[level]}</span>`;
+
+                    tableBody.append(`
+                        <tr>
+                            <td>${material.id}</td>
+                            <td>${material.materialName}</td>
+                            <td>${materialTypeMap[material.materialType]}</td>
+                            <td>${pointsMap[material.reservePointId] || '-'}</td>
+                            <td>${material.stockNum}</td>
+                            <td>${threshold}</td>
+                            <td>${levelBadge}</td>
+                            <td>${priorityMap[material.priorityLevel]}</td>
+                            <td>${formatDate(material.updateTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary me-2" onclick="showReplenishModal(${material.id}, ${material.stockNum})" data-bs-toggle="modal" data-bs-target="#replenishStockModal">补充库存</button>
+                                <button class="btn btn-sm btn-info" onclick="viewMaterialDetail(${material.id})">查看详情</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('搜索库存预警失败：', err);
+                alert('搜索库存预警失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 12. 显示补充库存模态框（Axios → Fetch改造）
+        async function showReplenishModal(materialId, currentStock) {
+            showLoading(true);
+            // 初始化模态框数据（保留原逻辑）
+            $('#replenishMaterialId').val(materialId);
+            $('#currentStock').val(currentStock);
+            $('#replenishNum').val('');
+            $('#replenishRemark').val('');
+            $('#replenishModalTitle').text('补充库存');
+
+            try {
+                // 获取物资名称设置模态框标题
+                const material = await fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${materialId}`);
+                $('#replenishModalTitle').text(`补充库存 - ${material.materialName}`);
+            } catch (err) {
+                console.error('获取物资名称失败：', err);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 提交补充库存（Axios → Fetch改造）
+        async function submitReplenishStock() {
+            showLoading(true);
+            const materialId = $('#replenishMaterialId').val();
+            const replenishNum = $('#replenishNum').val().trim();
+            const remark = $('#replenishRemark').val().trim();
+
+            // 前端验证（保留原逻辑）
+            if (!replenishNum || replenishNum < 1) {
+                alert('请输入有效的补充数量');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                // 获取当前物资信息
+                const material = await fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${materialId}`);
+                const newStockNum = parseInt(material.stockNum) + parseInt(replenishNum);
+
+                // 更新库存
+                await fetchPost(`${apiBaseUrl}/material/updateMaterial`, {
+                    id: materialId,
+                    stockNum: newStockNum,
+                    updateRemark: remark || '库存补充'
+                });
+
+                alert('库存补充成功');
+                $('#replenishStockModal').modal('hide');
+                loadWarningList();
+            } catch (err) {
+                console.error('库存补充失败：', err);
+                alert('库存补充失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 14. 提交预警阈值设置（Axios → Fetch改造）
+        async function submitThresholdSetting() {
+            showLoading(true);
+            const defaultThreshold = $('#defaultThreshold').val().trim();
+            const urgentRatio = $('#urgentRatio').val().trim();
+            const materialType = $('#materialTypeSelect').val();
+            const typeThreshold = $('#typeThreshold').val().trim();
+
+            // 前端验证（保留原逻辑）
+            if (!defaultThreshold || !urgentRatio) {
+                alert('请填写默认阈值和紧急预警比例');
+                showLoading(false);
+                return;
+            }
+            if (defaultThreshold < 1 || urgentRatio < 1 || urgentRatio > 99) {
+                alert('默认阈值需大于0，紧急预警比例需在1-99之间');
+                showLoading(false);
+                return;
+            }
+
+            // 构建提交数据（保留原逻辑）
+            const settingData = {
+                defaultThreshold: parseInt(defaultThreshold),
+                urgentRatio: parseInt(urgentRatio),
+                typeThresholds: {}
+            };
+            if (materialType && typeThreshold) {
+                settingData.typeThresholds[materialType] = parseInt(typeThreshold);
+            }
+
+            try {
+                await fetchPost(`${apiBaseUrl}/stockWarning/setThresholdSetting`, settingData);
+                alert('预警阈值设置成功');
+                $('#setWarningThresholdModal').modal('hide');
+                loadWarningList();
+            } catch (err) {
+                console.error('预警阈值设置失败：', err);
+                alert('预警阈值设置失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 15. 查看物资详情（Axios → Fetch改造）
+        async function viewMaterialDetail(materialId) {
+            showLoading(true);
+            try {
+                // 并行获取物资详情和储备点信息
+                const [material, point] = await Promise.all([
+                    fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${materialId}`),
+                    fetchGet(`${apiBaseUrl}/reservePoint/getReservePointByIds?id=${material.reservePointId}`)
+                ]);
+                const thresholdSetting = await getThresholdSetting();
+                const threshold = thresholdSetting.typeThresholds[material.materialType] || thresholdSetting.defaultThreshold;
+                const warningLevel = calculateWarningLevel(material.stockNum, threshold, thresholdSetting.urgentRatio);
+                const levelText = warningLevel ? (warningLevel === 1 ? '一般预警' : '紧急预警') : '无预警';
+
+                // 显示详情（保留原逻辑）
+                alert(`
+                    物资详情：
+                    名称：${material.materialName}
+                    类型：${materialTypeMap[material.materialType]}
+                    规格：${material.spec || '无'}
+                    储备点：${point.pointName || '-'}
+                    当前库存：${material.stockNum}
+                    预警阈值：${threshold}
+                    预警状态：${levelText}
+                    优先级：${priorityMap[material.priorityLevel]}
+                    创建时间：${formatDate(material.createTime)}
+                    最后更新：${formatDate(material.updateTime)}
+                `);
+            } catch (err) {
+                console.error('查看物资详情失败：', err);
+                alert('查看物资详情失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 16. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 17. 刷新列表（保留原逻辑）
+        function refreshWarningList() {
+            loadWarningList();
+        }
+
+        // 18. 页面加载时执行（保留原逻辑）
+        $(document).ready(async () => {
+            await getThresholdSetting();
+            loadWarningList();
+        });
+    </script>
+</body>
+</html>

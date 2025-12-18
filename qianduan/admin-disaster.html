@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灾情管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        .disaster-level-badge { padding: 0.3rem 0.6rem; border-radius: 0.3rem; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html" class="active">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>灾情管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addDisasterModal">新增灾情（管理员）</button>
+                        <button class="btn btn-secondary" onclick="refreshDisasterList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 搜索栏 -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchDisasterName" placeholder="搜索灾情名称">
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchDisasterLevel">
+                                    <option value="">所有等级</option>
+                                    <option value="1">一级（特别严重）</option>
+                                    <option value="2">二级（严重）</option>
+                                    <option value="3">三级（较重）</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="searchApproveStatus">
+                                    <option value="">所有状态</option>
+                                    <option value="0">待审核</option>
+                                    <option value="1">已通过</option>
+                                    <option value="2">已驳回</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-info w-100" onclick="searchDisaster()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>灾情名称</th>
+                                        <th>灾情等级</th>
+                                        <th>受灾区域</th>
+                                        <th>受灾人数</th>
+                                        <th>上报人</th>
+                                        <th>审核状态</th>
+                                        <th>上报时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="disasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增灾情模态框（管理员） -->
+    <div class="modal fade" id="addDisasterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增灾情（管理员）</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDisasterForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="addDisasterName" class="form-label">灾情名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addDisasterName" name="disasterName" required placeholder="例如：XX地区洪水灾害">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addDisasterLevel" class="form-label">灾情等级 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addDisasterLevel" name="disasterLevel" required>
+                                    <option value="1">一级（特别严重）</option>
+                                    <option value="2">二级（严重）</option>
+                                    <option value="3">三级（较重）</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addDisasterArea" class="form-label">受灾区域 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addDisasterArea" name="disasterArea" required placeholder="例如：XX省XX市XX县XX乡">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addAffectPeople" class="form-label">受灾人数</label>
+                                <input type="number" class="form-control" id="addAffectPeople" name="affectPeople" min="0" placeholder="请输入受灾人数（可选）">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addDescription" class="form-label">灾情描述 <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="addDescription" name="description" rows="4" required placeholder="请详细描述灾情情况"></textarea>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">审核状态（管理员新增默认通过）</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="approveStatus" id="addApprovePass" value="1" checked>
+                                    <label class="form-check-label" for="addApprovePass">已通过</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddDisaster()">确认新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 审核灾情模态框 -->
+    <div class="modal fade" id="approveDisasterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">审核灾情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="approveDisasterId">
+                    <div class="mb-3">
+                        <label class="form-label">审核结果</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="approveResult" id="approvePass" value="1">
+                            <label class="form-check-label" for="approvePass">通过</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="approveResult" id="approveReject" value="2">
+                            <label class="form-check-label" for="approveReject">驳回</label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="approveRemark" class="form-label">审核备注（可选）</label>
+                        <textarea class="form-control" id="approveRemark" rows="3" placeholder="请输入审核意见（驳回时必填）"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitApproveDisaster()">确认审核</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查看灾情详情模态框 -->
+    <div class="modal fade" id="viewDisasterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewDisasterTitle">灾情详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="viewDisasterContent">
+                    <!-- 动态加载详情 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 数据映射（保留原逻辑）
+        const disasterLevelMap = {1: '一级（特别严重）', 2: '二级（严重）', 3: '三级（较重）'};
+        const levelBadgeMap = {1: 'bg-danger', 2: 'bg-warning', 3: 'bg-info'};
+        const approveStatusMap = {0: '待审核', 1: '已通过', 2: '已驳回'};
+        const statusBadgeMap = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-danger'};
+
+        // 5. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 获取上报人姓名（Axios → Fetch改造）
+        async function getReporterName(userId) {
+            try {
+                const response = await fetch(`${apiBaseUrl}/user/getUserById?id=${userId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200 || !res.data) {
+                    return '未知用户';
+                }
+                return res.data.realName || '未知用户';
+            } catch (err) {
+                console.error(`获取用户${userId}姓名失败：`, err);
+                return '未知用户';
+            }
+        }
+
+        // 7. 加载灾情列表（Axios → Fetch改造）
+        async function loadDisasterList() {
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/disaster/getAllDisaster`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '加载灾情列表失败');
+                }
+
+                const disasters = res.data;
+                const tableBody = $('#disasterTableBody');
+                tableBody.empty();
+
+                // 批量获取上报人姓名（保留原逻辑）
+                const reporterPromises = disasters.map(disaster => getReporterName(disaster.reportUserId));
+                const reporterNames = await Promise.all(reporterPromises);
+
+                disasters.forEach((disaster, index) => {
+                    tableBody.append(`
+                        <tr>
+                            <td>${disaster.id}</td>
+                            <td>${disaster.disasterName}</td>
+                            <td><span class="disaster-level-badge ${levelBadgeMap[disaster.disasterLevel]} text-white">${disasterLevelMap[disaster.disasterLevel]}</span></td>
+                            <td>${disaster.disasterArea}</td>
+                            <td>${disaster.affectPeople || 0}</td>
+                            <td>${reporterNames[index]}</td>
+                            <td><span class="disaster-level-badge ${statusBadgeMap[disaster.approveStatus]} text-white">${approveStatusMap[disaster.approveStatus]}</span></td>
+                            <td>${formatDate(disaster.createTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="viewDisaster(${disaster.id})" data-bs-toggle="modal" data-bs-target="#viewDisasterModal">查看</button>
+                                ${disaster.approveStatus === 0 ? 
+                                    `<button class="btn btn-sm btn-primary me-2" onclick="showApproveModal(${disaster.id})" data-bs-toggle="modal" data-bs-target="#approveDisasterModal">审核</button>` : ''}
+                                <button class="btn btn-sm btn-danger" onclick="deleteDisaster(${disaster.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('加载灾情列表失败：', err);
+                alert('加载灾情列表失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 8. 搜索灾情（Axios → Fetch改造）
+        async function searchDisaster() {
+            showLoading(true);
+            const disasterName = $('#searchDisasterName').val().trim();
+            const disasterLevel = $('#searchDisasterLevel').val();
+            const approveStatus = $('#searchApproveStatus').val();
+
+            try {
+                // 构建带参数的URL（保留原逻辑）
+                let url = `${apiBaseUrl}/disaster/getAllDisaster`;
+                const params = [];
+                if (disasterName) params.push(`disasterName=${encodeURIComponent(disasterName)}`);
+                if (disasterLevel) params.push(`disasterLevel=${encodeURIComponent(disasterLevel)}`);
+                if (approveStatus) params.push(`approveStatus=${encodeURIComponent(approveStatus)}`);
+                if (params.length > 0) url += `?${params.join('&')}`;
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '搜索灾情失败');
+                }
+
+                const disasters = res.data;
+                const tableBody = $('#disasterTableBody');
+                tableBody.empty();
+
+                // 批量获取上报人姓名（保留原逻辑）
+                const reporterPromises = disasters.map(disaster => getReporterName(disaster.reportUserId));
+                const reporterNames = await Promise.all(reporterPromises);
+
+                disasters.forEach((disaster, index) => {
+                    tableBody.append(`
+                        <tr>
+                            <td>${disaster.id}</td>
+                            <td>${disaster.disasterName}</td>
+                            <td><span class="disaster-level-badge ${levelBadgeMap[disaster.disasterLevel]} text-white">${disasterLevelMap[disaster.disasterLevel]}</span></td>
+                            <td>${disaster.disasterArea}</td>
+                            <td>${disaster.affectPeople || 0}</td>
+                            <td>${reporterNames[index]}</td>
+                            <td><span class="disaster-level-badge ${statusBadgeMap[disaster.approveStatus]} text-white">${approveStatusMap[disaster.approveStatus]}</span></td>
+                            <td>${formatDate(disaster.createTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="viewDisaster(${disaster.id})" data-bs-toggle="modal" data-bs-target="#viewDisasterModal">查看</button>
+                                ${disaster.approveStatus === 0 ? 
+                                    `<button class="btn btn-sm btn-primary me-2" onclick="showApproveModal(${disaster.id})" data-bs-toggle="modal" data-bs-target="#approveDisasterModal">审核</button>` : ''}
+                                <button class="btn btn-sm btn-danger" onclick="deleteDisaster(${disaster.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('搜索灾情失败：', err);
+                alert('搜索灾情失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 9. 新增灾情提交（Axios → Fetch改造）
+        async function submitAddDisaster() {
+            showLoading(true);
+            const disasterData = {
+                disasterName: $('#addDisasterName').val().trim(),
+                disasterLevel: $('#addDisasterLevel').val(),
+                disasterArea: $('#addDisasterArea').val().trim(),
+                affectPeople: $('#addAffectPeople').val().trim() || 0,
+                description: $('#addDescription').val().trim(),
+                reportUserId: user.id, // 上报人=当前管理员ID
+                approveStatus: 1, // 管理员新增默认通过
+                // 新增：补充审核部门和审核人ID（从登录用户信息获取，无则传默认值）
+                approveDept: user.deptName || '应急管理局', 
+                approveUserId: user.id // 审核人=当前管理员ID
+            };
+
+            // 前端表单验证（保留原逻辑，无需修改）
+            if (!disasterData.disasterName || !disasterData.disasterArea || !disasterData.description) {
+                alert('请填写必填字段');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/disaster/addDisaster`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(disasterData)
+                });
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('新增灾情成功');
+                    $('#addDisasterModal').modal('hide');
+                    $('#addDisasterForm')[0].reset();
+                    loadDisasterList();
+                } else {
+                    alert('新增灾情失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('新增灾情失败：', err);
+                alert('新增灾情失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 10. 显示审核模态框（保留原逻辑）
+        function showApproveModal(id) {
+            $('#approveDisasterId').val(id);
+            $('input[name="approveResult"]').prop('checked', false);
+            $('#approveRemark').val('');
+        }
+
+        // 11. 提交审核结果（Axios → Fetch改造）
+         async function submitApproveDisaster() {
+    showLoading(true);
+    const id = $('#approveDisasterId').val();
+    const approveStatus = $('input[name="approveResult"]:checked').val();
+    const approveRemark = $('#approveRemark').val().trim();
+
+    if (!approveStatus) {
+        alert('请选择审核结果');
+        showLoading(false);
+        return;
+    }
+    if (approveStatus === '2' && !approveRemark) {
+        alert('驳回请填写审核备注');
+        showLoading(false);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${apiBaseUrl}/disaster/auditDisaster`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // 确保参数名与后端Disaster实体类字段一致（驼峰命名）
+            body: JSON.stringify({
+                id: id, // 对应实体类 id（Long）
+                approveStatus: parseInt(approveStatus), // 对应实体类 approveStatus（Integer）
+                approveUserId: user.id, // 对应实体类 approveUserId（Long）
+                approveDept: user.deptName || '应急管理局', // 对应实体类 approveDept（String）
+                approveRemark: approveRemark // 对应实体类 approveRemark（String）
+            })
+        });
+        const res = await response.json();
+        if (res.code === 200) {
+            alert(`审核${approveStatus === '1' ? '通过' : '驳回'}成功`);
+            $('#approveDisasterModal').modal('hide');
+            loadDisasterList();
+        } else {
+            alert('审核操作失败：' + (res.msg || '服务器内部错误'));
+        }
+    } catch (err) {
+        console.error('审核操作失败：', err);
+        alert('审核操作失败，请稍后重试：' + err.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+
+        // 12. 查看灾情详情（Axios → Fetch改造）
+        async function viewDisaster(id) {
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/disaster/getDisasterById?id=${id}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code !== 200 || !res.data) {
+                    throw new Error(res.msg || '加载灾情详情失败');
+                }
+
+                const disaster = res.data;
+                const reporterName = await getReporterName(disaster.reportUserId);
+
+                // 构建详情HTML（保留原逻辑）
+                const detailHtml = `
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6>基本信息</h6>
+                            <p><strong>灾情名称：</strong>${disaster.disasterName}</p>
+                            <p><strong>灾情等级：</strong><span class="disaster-level-badge ${levelBadgeMap[disaster.disasterLevel]} text-white">${disasterLevelMap[disaster.disasterLevel]}</span></p>
+                            <p><strong>受灾区域：</strong>${disaster.disasterArea}</p>
+                            <p><strong>受灾人数：</strong>${disaster.affectPeople || 0}人</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>上报信息</h6>
+                            <p><strong>上报人：</strong>${reporterName}</p>
+                            <p><strong>上报时间：</strong>${formatDate(disaster.createTime)}</p>
+                            <p><strong>审核状态：</strong><span class="disaster-level-badge ${statusBadgeMap[disaster.approveStatus]} text-white">${approveStatusMap[disaster.approveStatus]}</span></p>
+                            <p><strong>审核备注：</strong>${disaster.approveRemark || '无'}</p>
+                        </div>
+                        <div class="col-md-12">
+                            <h6>灾情描述</h6>
+                            <div class="p-3 border rounded bg-light">
+                                ${disaster.description || '无详细描述'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                $('#viewDisasterTitle').text(`灾情详情 - ${disaster.disasterName}`);
+                $('#viewDisasterContent').html(detailHtml);
+            } catch (err) {
+                console.error('查看灾情详情失败：', err);
+                $('#viewDisasterContent').html(`<div class="text-danger">加载详情失败：${err.message}</div>`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 删除灾情（Axios → Fetch改造）
+        async function deleteDisaster(id) {
+            if (!confirm('确定要删除该灾情吗？删除后不可恢复')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${apiBaseUrl}/disaster/deleteDisaster?id=${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const res = await response.json();
+                if (res.code === 200) {
+                    alert('删除灾情成功');
+                    loadDisasterList();
+                } else {
+                    alert('删除灾情失败：' + (res.msg || '服务器内部错误'));
+                }
+            } catch (err) {
+                console.error('删除灾情失败：', err);
+                alert('删除灾情失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 14. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // 15. 刷新列表（保留原逻辑）
+        function refreshDisasterList() {
+            loadDisasterList();
+        }
+
+        // 16. 页面加载时执行（保留原逻辑）
+        $(document).ready(loadDisasterList);
+    </script>
+</body>
+</html>

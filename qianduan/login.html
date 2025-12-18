@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灾害应急物资调度系统 - 登录注册</title>
+    <!-- 引入Tailwind CSS（核心：原子化样式） -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome（图标支持） -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 自定义Tailwind配置扩展 */
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
+
+        /* 全局渐变背景 */
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
+        }
+        .bg-gradient-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            backdrop-filter: blur(10px);
+        }
+
+        /* 模态框动画 */
+        .modal-enter {
+            animation: modalFadeIn 0.3s ease-out forwards;
+        }
+        .modal-content-enter {
+            animation: modalSlideUp 0.3s ease-out forwards;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes modalSlideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* 按钮hover效果增强 */
+        .btn-primary {
+            @apply bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl transition-all duration-300 hover:shadow-xl active:scale-98 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md;
+        }
+        .btn-secondary {
+            @apply bg-gray-100 text-gray-700 font-medium rounded-xl transition-all duration-300 hover:bg-gray-200 active:scale-98 focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm;
+        }
+
+        /* 输入框样式优化 */
+        .form-input {
+            @apply w-full px-4 py-3 border border-gray-300 rounded-xl transition-all duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none bg-white placeholder-gray-400 shadow-sm;
+        }
+        .form-input:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .form-label {
+            @apply block text-sm font-medium text-gray-700 mb-2;
+        }
+
+        /* 图标颜色统一 */
+        .icon-primary {
+            @apply text-blue-600;
+        }
+
+        /* 错误提示动画 */
+        .error-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* 加载动画优化 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(2px);
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top: 5px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 模态框基础样式优化 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 1.25rem;
+            width: 100%;
+            max-width: 650px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #3b82f6, #1e40af, #3b82f6);
+            background-size: 200% 100%;
+            animation: gradientShift 3s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* 卡片阴影增强 */
+        .card-shadow {
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.15), 0 10px 15px -6px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 隐藏类 */
+        .hidden {
+            display: none;
+        }
+
+        /* 浮动粒子背景 */
+        .particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.1);
+            animation: float 15s infinite linear;
+        }
+        @keyframes float {
+            0% {
+                transform: translateY(0) translateX(0) rotate(0deg);
+                opacity: 0.8;
+            }
+            50% {
+                transform: translateY(-100px) translateX(100px) rotate(180deg);
+                opacity: 0.4;
+            }
+            100% {
+                transform: translateY(0) translateX(0) rotate(360deg);
+                opacity: 0.8;
+            }
+        }
+
+        /* 脉冲动画 */
+        .pulse-ring {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px solid rgba(59, 130, 246, 0.4);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            70% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        /* 输入框图标动画 */
+        .input-container {
+            position: relative;
+        }
+        .input-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: all 0.3s ease;
+            color: #6b7280;
+        }
+        .form-input:focus + .input-icon {
+            color: #3b82f6;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        /* 按钮加载动画 */
+        .btn-loading {
+            position: relative;
+            color: transparent;
+        }
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 浮动粒子背景 -->
+    <div class="particles-container" id="particles"></div>
+
+    <!-- 背景装饰元素（增强视觉层次） -->
+    <div class="fixed top-0 right-0 w-1/2 h-full bg-gradient-to-l from-blue-50/50 to-transparent -z-10"></div>
+    <div class="fixed bottom-0 left-0 w-1/3 h-1/3 bg-blue-100 rounded-full filter blur-3xl opacity-30 -z-10"></div>
+    <div class="fixed top-1/4 right-1/4 w-1/4 h-1/4 bg-indigo-100 rounded-full filter blur-3xl opacity-20 -z-10"></div>
+
+    <!-- 登录页面（默认显示） -->
+    <div id="loginPage" class="login-container min-h-screen flex items-center justify-center p-4 md:p-8">
+        <div class="bg-gradient-card card-shadow card-hover rounded-2xl p-8 md:p-10 w-full max-w-md border border-gray-100/50 backdrop-blur-sm">
+            <!-- 登录图标区域 -->
+            <div class="text-center mb-10 relative">
+                <div class="mx-auto w-20 h-20 bg-gradient-primary rounded-full flex items-center justify-center mb-5 shadow-lg relative">
+                    <i class="fas fa-truck-medical text-white text-3xl z-10"></i> <!-- 灾害应急图标 -->
+                    <div class="pulse-ring"></div>
+                </div>
+                <h1 class="text-[clamp(1.75rem,4vw,2.25rem)] font-bold text-gray-800 mb-3 bg-gradient-to-r from-blue-800 to-blue-600 bg-clip-text text-transparent">灾害应急物资调度系统</h1>
+                <p class="text-gray-500 flex items-center justify-center gap-2">
+                    <i class="fas fa-shield-halven icon-primary"></i>
+                    应急管理 · 物资调度 · 救援保障
+                </p>
+            </div>
+
+            <!-- 登录表单 -->
+            <form id="loginForm" class="space-y-6">
+                <div class="space-y-2 input-container">
+                    <label for="username" class="form-label flex items-center gap-2">
+                        <i class="fas fa-user icon-primary"></i>
+                        用户名
+                    </label>
+                    <input type="text" id="username" name="username" required 
+                           class="form-input pl-12"
+                           placeholder="请输入用户名">
+                    <i class="fas fa-user input-icon"></i>
+                </div>
+                <div class="space-y-2 input-container">
+                    <label for="password" class="form-label flex items-center gap-2">
+                        <i class="fas fa-lock icon-primary"></i>
+                        密码
+                    </label>
+                    <input type="password" id="password" name="password" required 
+                           class="form-input pl-12"
+                           placeholder="请输入密码">
+                    <i class="fas fa-lock input-icon"></i>
+                </div>
+                <div id="loginError" class="text-red-500 text-sm hidden error-shake flex items-center gap-2 bg-red-50 p-3 rounded-lg">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span></span>
+                </div> <!-- 错误提示 -->
+                <button type="submit" class="w-full py-3 btn-primary text-lg font-medium">
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    立即登录
+                </button>
+            </form>
+
+            <!-- 注册链接 -->
+            <div class="mt-8 text-center">
+                <p class="text-sm text-gray-600">
+                    还没有账号？ 
+                    <a href="#" onclick="showRegisterModal()" class="text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors duration-200 flex items-center justify-center gap-1 group">
+                        <i class="fas fa-user-plus group-hover:scale-110 transition-transform"></i>
+                        立即注册
+                    </a>
+                </p>
+            </div>
+
+            <!-- 底部说明文字 -->
+            <div class="mt-10 text-center text-xs text-gray-400">
+                <p>© 2025 灾害应急物资调度系统 版权所有</p>
+                <p class="mt-1">应急响应 · 高效调度 · 生命至上</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 注册模态框（默认隐藏） -->
+    <div id="registerModal" class="modal hidden modal-enter">
+        <div class="modal-content modal-content-enter">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-user-plus text-blue-600"></i>
+                    用户注册
+                </h2>
+                <button onclick="hideModal('registerModal')" class="text-gray-400 hover:text-gray-700 transition-colors duration-200 p-2 rounded-full hover:bg-gray-100">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="registerForm" class="space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- 用户名 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-user icon-primary"></i>
+                            用户名
+                        </label>
+                        <input type="text" name="username" required 
+                               class="form-input py-2 pl-12"
+                               placeholder="请输入用户名">
+                        <i class="fas fa-user input-icon"></i>
+                    </div>
+                    <!-- 真实姓名 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-id-card icon-primary"></i>
+                            真实姓名
+                        </label>
+                        <input type="text" name="realName" required 
+                               class="form-input py-2 pl-12"
+                               placeholder="请输入真实姓名">
+                        <i class="fas fa-id-card input-icon"></i>
+                    </div>
+                    <!-- 密码 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-lock icon-primary"></i>
+                            密码
+                        </label>
+                        <input type="password" name="password" required 
+                               class="form-input py-2 pl-12"
+                               placeholder="请输入密码（6-20位）">
+                        <i class="fas fa-lock input-icon"></i>
+                    </div>
+                    <!-- 确认密码 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-lock-open icon-primary"></i>
+                            确认密码
+                        </label>
+                        <input type="password" name="confirmPassword" required 
+                               class="form-input py-2 pl-12"
+                               placeholder="请再次输入密码">
+                        <i class="fas fa-lock-open input-icon"></i>
+                    </div>
+                    <!-- 联系电话 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-phone icon-primary"></i>
+                            联系电话
+                        </label>
+                        <input type="tel" name="phone" required 
+                               class="form-input py-2 pl-12"
+                               placeholder="请输入11位手机号">
+                        <i class="fas fa-phone input-icon"></i>
+                    </div>
+                    <!-- 所属单位 -->
+                    <div class="space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-building icon-primary"></i>
+                            所属单位（可选）
+                        </label>
+                        <input type="text" name="unit" 
+                               class="form-input py-2 pl-12"
+                               placeholder="如 XX 救援队、XX 物资站">
+                        <i class="fas fa-building input-icon"></i>
+                    </div>
+                    <!-- 地址 -->
+                    <div class="md:col-span-2 space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-map-marker-alt icon-primary"></i>
+                            地址（可选）
+                        </label>
+                        <input type="text" name="address" 
+                               class="form-input py-2 pl-12"
+                               placeholder="受灾群众居住地址 / 工作人员办公地址">
+                        <i class="fas fa-map-marker-alt input-icon"></i>
+                    </div>
+                    <!-- 用户角色 -->
+                    <div class="md:col-span-2 space-y-2 input-container">
+                        <label class="form-label flex items-center gap-2">
+                            <i class="fas fa-user-tag icon-primary"></i>
+                            用户角色
+                        </label>
+                        <select name="roleId" required 
+                                class="form-input py-2 appearance-none bg-white bg-no-repeat bg-right pr-8 pl-12"
+                                style="background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2364748b%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>');">
+                            <option value="">请选择角色</option>
+                            <option value="1">救援人员</option>
+                            <option value="2">物资管理员</option>
+                            <option value="3" selected>受灾群众</option>
+                            <option value="4">政府部门</option>
+                        </select>
+                        <i class="fas fa-user-tag input-icon"></i>
+                    </div>
+                </div>
+                <!-- 错误提示 -->
+                <div id="registerError" class="text-red-500 text-sm mt-2 hidden error-shake flex items-center gap-2 bg-red-50 p-3 rounded-lg">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span></span>
+                </div>
+                <!-- 按钮区域 -->
+                <div class="flex justify-end mt-8 space-x-4">
+                    <button type="button" onclick="hideModal('registerModal')" 
+                            class="px-6 py-2 btn-secondary">
+                        <i class="fas fa-times mr-2"></i>
+                        取消
+                    </button>
+                    <button type="submit" class="px-8 py-2 btn-primary">
+                        <i class="fas fa-check mr-2"></i>
+                        注册
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 加载动画（默认隐藏） -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // 1. 全局变量（对应新代码的设计思路）
+        const baseUrl = 'http://localhost:8080'; // 后端基础地址
+        let currentUser = null; // 存储当前登录用户
+        const loginErrorEl = document.getElementById('loginError');
+        const registerErrorEl = document.getElementById('registerError');
+
+        // 2. 页面初始化：DOM加载完成后绑定事件
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+            createParticles(); // 创建浮动粒子背景
+        });
+
+        // 3. 模态框控制函数
+        function showRegisterModal() {
+            const modal = document.getElementById('registerModal');
+            modal.classList.remove('hidden');
+            // 重新触发动画
+            modal.classList.remove('modal-enter');
+            void modal.offsetWidth; // 触发重绘
+            modal.classList.add('modal-enter');
+            
+            const modalContent = modal.querySelector('.modal-content');
+            modalContent.classList.remove('modal-content-enter');
+            void modalContent.offsetWidth; // 触发重绘
+            modalContent.classList.add('modal-content-enter');
+            
+            // 清空注册表单和错误提示
+            document.getElementById('registerForm').reset();
+            registerErrorEl.classList.add('hidden');
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.add('hidden');
+        }
+
+        // 4. 加载状态控制函数
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loading');
+            show ? loadingEl.classList.remove('hidden') : loadingEl.classList.add('hidden');
+        }
+
+        // 5. 登录处理函数（核心：前后端连接逻辑）
+        async function handleLogin(e) {
+            e.preventDefault();
+            loginErrorEl.classList.add('hidden');
+
+            // 表单数据获取
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            // 前端表单验证
+            if (!username || !password) {
+                showLoginError('用户名和密码不能为空');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                // 发送登录请求（form-urlencoded格式）
+                console.log(`发送登录请求到：${baseUrl}/user/loginVerify`);
+                console.log(`请求参数：username=${username}, password=${password}`);
+                const response = await fetch(`${baseUrl}/user/loginVerify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}` // 编码特殊字符
+                });
+                console.log(`登录请求响应状态：${response.status}`);
+                console.log(`登录请求响应头：`, response.headers);
+                const result = await response.json();
+                console.log(`登录请求响应体：`, result);
+
+                if (result.code === 200) {
+                    currentUser = result.data;
+                    // 存储用户信息到本地存储
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                    // 角色跳转逻辑（保持原逻辑）
+                    window.location.href = currentUser.roleId === 3 ? 'user-index.html' : 'admin-index.html';
+                } else {
+                    showLoginError('登录失败：' + (result.msg || '账号或密码错误'));
+                }
+            } catch (error) {
+                console.error('登录错误：', error);
+                showLoginError('网络错误，请检查后端服务是否启动、接口地址是否正确');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 6. 注册处理函数（核心：前后端连接逻辑）
+        async function handleRegister(e) {
+            e.preventDefault();
+            registerErrorEl.classList.add('hidden');
+
+            const form = e.target;
+            const formData = new FormData(form);
+            const username = formData.get('username').trim();
+            const password = formData.get('password').trim();
+            const confirmPassword = formData.get('confirmPassword').trim();
+            const realName = formData.get('realName').trim();
+            const phone = formData.get('phone').trim();
+            const roleId = formData.get('roleId');
+
+            // 前端表单验证
+            if (!username || !password || !realName || !phone || !roleId) {
+                showRegisterError('带必填项的字段不能为空');
+                return;
+            }
+            if (password !== confirmPassword) {
+                showRegisterError('两次输入的密码不一致');
+                return;
+            }
+            if (password.length < 6 || password.length > 20) {
+                showRegisterError('密码长度应在6-20位之间');
+                return;
+            }
+            if (phone.length !== 11 || isNaN(phone)) {
+                showRegisterError('请输入有效的11位手机号');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                // 构造注册数据对象
+                const userData = {
+                    username: username,
+                    password: password,
+                    realName: realName,
+                    phone: phone,
+                    unit: formData.get('unit').trim(),
+                    address: formData.get('address').trim(),
+                    roleId: roleId
+                };
+
+                // 发送注册请求（JSON格式）
+                const response = await fetch(`${baseUrl}/user/addUser`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    alert('注册成功，请登录');
+                    hideModal('registerModal');
+                    // 清空登录表单
+                    document.getElementById('loginForm').reset();
+                } else {
+                    showRegisterError('注册失败：' + (result.msg || '服务器内部错误'));
+                }
+            } catch (error) {
+                console.error('注册错误：', error);
+                showRegisterError('网络错误，请检查后端服务是否启动、接口地址是否正确');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 辅助函数：显示登录错误
+        function showLoginError(message) {
+            loginErrorEl.querySelector('span').textContent = message;
+            loginErrorEl.classList.remove('hidden');
+            // 重新触发动画
+            loginErrorEl.classList.remove('error-shake');
+            void loginErrorEl.offsetWidth;
+            loginErrorEl.classList.add('error-shake');
+        }
+
+        // 辅助函数：显示注册错误
+        function showRegisterError(message) {
+            registerErrorEl.querySelector('span').textContent = message;
+            registerErrorEl.classList.remove('hidden');
+            // 重新触发动画
+            registerErrorEl.classList.remove('error-shake');
+            void registerErrorEl.offsetWidth;
+            registerErrorEl.classList.add('error-shake');
+        }
+
+        // 创建浮动粒子背景
+        function createParticles() {
+            const container = document.getElementById('particles');
+            const particleCount = 20;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                // 随机大小
+                const size = Math.random() * 60 + 20;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // 随机位置
+                particle.style.left = `${Math.random() * 100}%`;
+                particle.style.top = `${Math.random() * 100}%`;
+                
+                // 随机动画延迟
+                particle.style.animationDelay = `${Math.random() * 15}s`;
+                
+                // 随机颜色
+                const colors = [
+                    'rgba(59, 130, 246, 0.1)',
+                    'rgba(99, 102, 241, 0.1)',
+                    'rgba(139, 92, 246, 0.1)',
+                    'rgba(14, 165, 233, 0.1)'
+                ];
+                particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+                
+                container.appendChild(particle);
+            }
+        }
+    </script>
+</body>
+</html>

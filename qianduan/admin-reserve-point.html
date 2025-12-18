@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>储备点管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html" class="active">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>储备点管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addReservePointModal">新增储备点</button>
+                        <button class="btn btn-secondary" onclick="refreshReservePointList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 搜索栏 -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <input type="text" class="form-control" id="searchPointName" placeholder="搜索储备点名称、地址、城市、负责人、电话或管理部门">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-info w-100" onclick="searchReservePoint()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>储备点名称</th>
+                                        <th>管理部门</th>
+                                        <th>地址</th>
+                                        <th>负责人</th>
+                                        <th>联系电话</th>
+                                        <th>物资种类数</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reservePointTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增储备点模态框 -->
+    <div class="modal fade" id="addReservePointModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增储备点</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addReservePointForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="addPointName" class="form-label">储备点名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addPointName" name="pointName" required placeholder="请输入储备点名称">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addManageDept" class="form-label">管理部门 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addManageDept" name="manageDept" required placeholder="请输入管理部门（如：应急管理局）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addContactPerson" class="form-label">负责人 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addContactPerson" name="contactPerson" required placeholder="请输入负责人姓名">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addContactPhone" class="form-label">联系电话 <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="addContactPhone" name="contactPhone" required placeholder="请输入11位手机号码">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addProvince" class="form-label">省份 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addProvince" name="province" required placeholder="请输入省份（如：广东省）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addCity" class="form-label">城市 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addCity" name="city" required placeholder="请输入城市（如：深圳市）">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addAddress" class="form-label">详细地址 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addAddress" name="address" required placeholder="请输入详细地址（区/县/乡/街道，如：南山区科技园）">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addRemark" class="form-label">备注</label>
+                                <textarea class="form-control" id="addRemark" name="remark" rows="3" placeholder="请输入备注信息（可选）"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddReservePoint()">确认新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑储备点模态框 -->
+    <div class="modal fade" id="editReservePointModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑储备点</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editReservePointForm">
+                        <input type="hidden" id="editReservePointId" name="id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="editPointName" class="form-label">储备点名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editPointName" name="pointName" required placeholder="请输入储备点名称">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editManageDept" class="form-label">管理部门 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editManageDept" name="manageDept" required placeholder="请输入管理部门（如：应急管理局）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editContactPerson" class="form-label">负责人 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editContactPerson" name="contactPerson" required placeholder="请输入负责人姓名">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editContactPhone" class="form-label">联系电话 <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control" id="editContactPhone" name="contactPhone" required placeholder="请输入11位手机号码">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editProvince" class="form-label">省份 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editProvince" name="province" required placeholder="请输入省份（如：广东省）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editCity" class="form-label">城市 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editCity" name="city" required placeholder="请输入城市（如：深圳市）">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="editAddress" class="form-label">详细地址 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editAddress" name="address" required placeholder="请输入详细地址（区/县/乡/街道）">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="editRemark" class="form-label">备注</label>
+                                <textarea class="form-control" id="editRemark" name="remark" rows="3" placeholder="请输入备注信息（可选）"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitEditReservePoint()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增锁机制）
+        let loadingLock = false;
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            if (show) {
+                if (loadingLock) return;
+                loadingLock = true;
+                loadingEl.style.display = 'flex';
+            } else {
+                loadingLock = false;
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // 3. 验证登录状态
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 退出登录
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 5. 发送GET请求的工具函数（添加超时处理+错误详情）
+        async function fetchGet(url, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`GET ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`GET ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        // 6. 发送POST请求的工具函数（添加超时处理+错误详情）
+        async function fetchPost(url, data, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    body: JSON.stringify(data),
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`POST ${url} 请求数据：`, data);
+                console.log(`POST ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`POST ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        // 7. 发送DELETE请求的工具函数
+        async function fetchDelete(url, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`DELETE ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`DELETE ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        // 8. 统计储备点物资种类数（兼容后端接口）
+        async function getMaterialCountByPointId(pointId) {
+            try {
+                const allMaterials = await fetchGet(`${apiBaseUrl}/material/getMaterialList`);
+                const pointMaterials = allMaterials.filter(m => m.reservePointId == pointId);
+                console.log(`储备点${pointId}物资数量：`, pointMaterials.length);
+                return pointMaterials.length;
+            } catch (err) {
+                console.error(`获取储备点${pointId}物资数量失败：`, err);
+                return 0;
+            }
+        }
+
+        // 9. 加载储备点列表（修复地址显示+物资数量+管理部门）
+        async function loadReservePointList() {
+            showLoading(true);
+            try {
+                const reservePoints = await fetchGet(`${apiBaseUrl}/reservePoint/getAllReservePoint`);
+                console.log('所有储备点数据：', reservePoints);
+                const tableBody = $('#reservePointTableBody');
+                tableBody.empty();
+
+                if (!reservePoints || reservePoints.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="9" class="text-center py-3">暂无储备点数据</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                const countPromises = reservePoints.map(point => getMaterialCountByPointId(point.id));
+                const counts = await Promise.all(countPromises);
+
+                reservePoints.forEach((point, index) => {
+                    tableBody.append(`
+                        <tr>
+                            <td>${point.id || '-'}</td>
+                            <td>${point.pointName || '-'}</td>
+                            <td>${point.manageDept || '-'}</td>
+                            <td>${point.province || ''} ${point.city || ''} ${point.address || ''}</td>
+                            <td>${point.contactPerson || '-'}</td>
+                            <td>${point.contactPhone || '-'}</td>
+                            <td>${counts[index] || 0}</td>
+                            <td>${formatDate(point.createTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="editReservePoint(${point.id})" data-bs-toggle="modal" data-bs-target="#editReservePointModal">编辑</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteReservePoint(${point.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('加载储备点列表失败：', err);
+                alert('加载储备点列表失败，请稍后重试：' + err.message);
+                $('#reservePointTableBody').html(`
+                    <tr>
+                        <td colspan="9" class="text-center py-3 text-danger">加载失败，请稍后重试</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 10. 搜索储备点（前端全量过滤，确保查询生效）
+        async function searchReservePoint() {
+            showLoading(true);
+            const keyword = $('#searchPointName').val().trim().toLowerCase();
+            console.log('搜索关键词：', keyword);
+
+            try {
+                // 先获取全量数据
+                const reservePoints = await fetchGet(`${apiBaseUrl}/reservePoint/getAllReservePoint`);
+                // 前端精准过滤（忽略大小写，多字段匹配）
+                const filteredPoints = reservePoints.filter(point => 
+                    (point.pointName && point.pointName.toLowerCase().includes(keyword)) || 
+                    (point.manageDept && point.manageDept.toLowerCase().includes(keyword)) ||
+                    (point.city && point.city.toLowerCase().includes(keyword)) ||
+                    (point.address && point.address.toLowerCase().includes(keyword)) || 
+                    (point.province && point.province.toLowerCase().includes(keyword)) ||
+                    (point.contactPerson && point.contactPerson.toLowerCase().includes(keyword)) ||
+                    (point.contactPhone && point.contactPhone.includes(keyword))
+                );
+
+                console.log('搜索结果：', filteredPoints);
+                const tableBody = $('#reservePointTableBody');
+                tableBody.empty();
+
+                if (filteredPoints.length === 0) {
+                    tableBody.append(`
+                        <tr>
+                            <td colspan="9" class="text-center py-3">未找到符合条件的储备点</td>
+                        </tr>
+                    `);
+                    showLoading(false);
+                    return;
+                }
+
+                const countPromises = filteredPoints.map(point => getMaterialCountByPointId(point.id));
+                const counts = await Promise.all(countPromises);
+
+                filteredPoints.forEach((point, index) => {
+                    tableBody.append(`
+                        <tr>
+                            <td>${point.id || '-'}</td>
+                            <td>${point.pointName || '-'}</td>
+                            <td>${point.manageDept || '-'}</td>
+                            <td>${point.province || ''} ${point.city || ''} ${point.address || ''}</td>
+                            <td>${point.contactPerson || '-'}</td>
+                            <td>${point.contactPhone || '-'}</td>
+                            <td>${counts[index] || 0}</td>
+                            <td>${formatDate(point.createTime)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info me-2" onclick="editReservePoint(${point.id})" data-bs-toggle="modal" data-bs-target="#editReservePointModal">编辑</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteReservePoint(${point.id})">删除</button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } catch (err) {
+                console.error('搜索储备点失败：', err);
+                alert('搜索储备点失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 新增储备点提交（不传输update_time）
+        async function submitAddReservePoint() {
+            showLoading(true);
+            const pointData = {
+                pointName: $('#addPointName').val().trim(),
+                manageDept: $('#addManageDept').val().trim(),
+                contactPerson: $('#addContactPerson').val().trim(),
+                contactPhone: $('#addContactPhone').val().trim(),
+                province: $('#addProvince').val().trim(),
+                city: $('#addCity').val().trim(),
+                address: $('#addAddress').val().trim(),
+                remark: $('#addRemark').val().trim(),
+                createTime: new Date().toISOString()
+            };
+
+            // 表单验证
+            const phoneReg = /^1[3-9]\d{9}$/;
+            const errorMsg = [];
+            if (!pointData.pointName) errorMsg.push('储备点名称不能为空');
+            if (!pointData.manageDept) errorMsg.push('管理部门不能为空');
+            if (!pointData.contactPerson) errorMsg.push('负责人不能为空');
+            if (!pointData.contactPhone) errorMsg.push('联系电话不能为空');
+            else if (!phoneReg.test(pointData.contactPhone)) errorMsg.push('联系电话格式不正确（需11位手机号）');
+            if (!pointData.province) errorMsg.push('省份不能为空');
+            if (!pointData.city) errorMsg.push('城市不能为空');
+            if (!pointData.address) errorMsg.push('详细地址不能为空');
+
+            if (errorMsg.length > 0) {
+                alert('提交失败：\n' + errorMsg.join('\n'));
+                showLoading(false);
+                return;
+            }
+
+            try {
+                await fetchPost(`${apiBaseUrl}/reservePoint/addReservePoint`, pointData);
+                alert('新增储备点成功');
+                $('#addReservePointModal').modal('hide');
+                $('#addReservePointForm')[0].reset();
+                loadReservePointList();
+            } catch (err) {
+                console.error('新增储备点失败：', err);
+                alert('新增储备点失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 12. 编辑储备点加载数据
+        async function editReservePoint(id) {
+            showLoading(true);
+            try {
+                let point = null;
+                try {
+                    point = await fetchGet(`${apiBaseUrl}/reservePoint/getReservePointById?id=${id}`);
+                } catch (e) {
+                    const pointList = await fetchGet(`${apiBaseUrl}/reservePoint/getReservePointByIds?ids=${id}`);
+                    point = pointList && pointList.length > 0 ? pointList[0] : null;
+                }
+
+                if (!point) throw new Error("储备点数据不存在");
+                console.log('编辑储备点数据：', point);
+
+                $('#editReservePointId').val(point.id || '');
+                $('#editPointName').val(point.pointName || '');
+                $('#editManageDept').val(point.manageDept || '');
+                $('#editContactPerson').val(point.contactPerson || '');
+                $('#editContactPhone').val(point.contactPhone || '');
+                $('#editProvince').val(point.province || '');
+                $('#editCity').val(point.city || '');
+                $('#editAddress').val(point.address || '');
+                $('#editRemark').val(point.remark || '');
+            } catch (err) {
+                console.error('加载储备点数据失败：', err);
+                alert('加载储备点数据失败，请稍后重试：' + err.message);
+                $('#editReservePointModal').modal('hide');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 提交编辑储备点（不传输update_time）
+        async function submitEditReservePoint() {
+            showLoading(true);
+            const pointData = {
+                id: $('#editReservePointId').val(),
+                pointName: $('#editPointName').val().trim(),
+                manageDept: $('#editManageDept').val().trim(),
+                contactPerson: $('#editContactPerson').val().trim(),
+                contactPhone: $('#editContactPhone').val().trim(),
+                province: $('#editProvince').val().trim(),
+                city: $('#editCity').val().trim(),
+                address: $('#editAddress').val().trim(),
+                remark: $('#editRemark').val().trim()
+                // 彻底移除update_time字段，不传输给后端
+            };
+
+            // 表单验证
+            const phoneReg = /^1[3-9]\d{9}$/;
+            const errorMsg = [];
+            if (!pointData.id) errorMsg.push('储备点ID异常');
+            if (!pointData.pointName) errorMsg.push('储备点名称不能为空');
+            if (!pointData.manageDept) errorMsg.push('管理部门不能为空');
+            if (!pointData.contactPerson) errorMsg.push('负责人不能为空');
+            if (!pointData.contactPhone) errorMsg.push('联系电话不能为空');
+            else if (!phoneReg.test(pointData.contactPhone)) errorMsg.push('联系电话格式不正确（需11位手机号）');
+            if (!pointData.province) errorMsg.push('省份不能为空');
+            if (!pointData.city) errorMsg.push('城市不能为空');
+            if (!pointData.address) errorMsg.push('详细地址不能为空');
+
+            if (errorMsg.length > 0) {
+                alert('提交失败：\n' + errorMsg.join('\n'));
+                showLoading(false);
+                return;
+            }
+
+            try {
+                await fetchPost(`${apiBaseUrl}/reservePoint/modifyReservePoint`, pointData);
+                alert('修改储备点成功');
+                $('#editReservePointModal').modal('hide');
+                loadReservePointList();
+            } catch (err) {
+                console.error('修改储备点失败：', err);
+                alert('修改储备点失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 14. 删除储备点
+        async function deleteReservePoint(id) {
+            showLoading(true);
+            try {
+                const materialCount = await getMaterialCountByPointId(id);
+                if (materialCount > 0) {
+                    alert(`该储备点下有${materialCount}种物资，请先删除关联物资再删除储备点`);
+                    return;
+                }
+
+                if (!confirm('确定要删除该储备点吗？删除后不可恢复')) {
+                    return;
+                }
+
+                await fetchDelete(`${apiBaseUrl}/reservePoint/deleteReservePoint?id=${id}`);
+                alert('删除储备点成功');
+                loadReservePointList();
+            } catch (err) {
+                console.error('删除储备点失败：', err);
+                alert('删除储备点失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 15. 日期格式化
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return '-';
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch (e) {
+                console.error('日期格式化失败：', e);
+                return dateStr || '-';
+            }
+        }
+
+        // 16. 刷新列表
+        function refreshReservePointList() {
+            $('#searchPointName').val('');
+            loadReservePointList();
+        }
+
+        // 17. 页面加载时执行
+        $(document).ready(() => {
+            console.log('储备点管理页面加载完成，API基础地址：', apiBaseUrl);
+            console.log('当前登录用户：', user);
+            loadReservePointList();
+        });
+    </script>
+</body>
+</html>

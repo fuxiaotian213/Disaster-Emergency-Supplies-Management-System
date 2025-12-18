@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物资管理 - 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .sidebar { height: 100vh; position: sticky; top: 0; background-color: #2d3748; color: white; padding: 1.5rem; }
+        .sidebar-nav { list-style: none; padding: 0; }
+        .sidebar-nav li { margin-bottom: 1rem; }
+        .sidebar-nav a { color: #adb5bd; text-decoration: none; display: block; padding: 0.5rem; border-radius: 0.3rem; }
+        .sidebar-nav a:hover, .sidebar-nav a.active { color: white; background-color: #4a5568; }
+        .content { padding: 2rem; }
+        .table-card { max-width: 100%; }
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        /* 加载动画 */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-2 sidebar">
+                <h4 class="mb-4">管理后台</h4>
+                <ul class="sidebar-nav">
+                    <li><a href="admin-index.html">首页概览</a></li>
+                    <li><a href="admin-user.html">用户管理</a></li>
+                    <li><a href="admin-carousel.html">轮播图管理</a></li>
+                    <li><a href="admin-material.html" class="active">物资管理</a></li>
+                    <li><a href="admin-reserve-point.html">储备点管理</a></li>
+                    <li><a href="admin-disaster.html">灾情管理</a></li>
+                    <li><a href="admin-order.html">订单管理</a></li>
+                    <li><a href="admin-stock-warning.html">库存预警</a></li>
+                    <li><a href="admin-evaluation.html">意见反馈</a></li>
+                    <li><a href="javascript:logout()">退出登录</a></li>
+                </ul>
+            </div>
+
+            <!-- 主内容区 -->
+            <div class="col-md-10 content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>物资管理</h2>
+                    <div>
+                        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addMaterialModal">新增物资</button>
+                        <button class="btn btn-secondary" onclick="refreshMaterialList()">刷新列表</button>
+                    </div>
+                </div>
+
+                <!-- 搜索栏（多条件组合查询） -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchMaterialName" placeholder="搜索物资名称">
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="searchMaterialType">
+                                    <option value="">所有类型</option>
+                                    <option value="1">帐篷</option>
+                                    <option value="2">食品</option>
+                                    <option value="3">药品</option>
+                                    <option value="4">工具</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="searchPriorityLevel">
+                                    <option value="">所有优先级</option>
+                                    <option value="1">高（紧急）</option>
+                                    <option value="2">中（常规）</option>
+                                    <option value="3">低（备用）</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="searchReservePointId">
+                                    <option value="">所有储备点</option>
+                                </select>
+                            </div>
+                            <div class="col-md-1">
+                                <button class="btn btn-info w-100" onclick="searchMaterial()">搜索</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表格 -->
+                <div class="card table-card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>物资名称</th>
+                                        <th>物资类型</th>
+                                        <th>规格</th>
+                                        <th>库存数量</th>
+                                        <th>优先级</th>
+                                        <th>所属储备点</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="materialTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增物资模态框 -->
+    <div class="modal fade" id="addMaterialModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新增物资</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addMaterialForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="addMaterialName" class="form-label">物资名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addMaterialName" name="materialName" required placeholder="请输入物资名称">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addMaterialType" class="form-label">物资类型 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addMaterialType" name="materialType" required>
+                                    <option value="">请选择物资类型</option>
+                                    <option value="1">帐篷</option>
+                                    <option value="2">食品</option>
+                                    <option value="3">药品</option>
+                                    <option value="4">工具</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addSpec" class="form-label">规格</label>
+                                <input type="text" class="form-control" id="addSpec" name="spec" placeholder="请输入物资规格（可选）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addStockNum" class="form-label">库存数量 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="addStockNum" name="stockNum" required min="0" placeholder="请输入库存数量">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addPriorityLevel" class="form-label">优先级 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addPriorityLevel" name="priorityLevel" required>
+                                    <option value="">请选择优先级</option>
+                                    <option value="1">高（紧急）</option>
+                                    <option value="2">中（常规）</option>
+                                    <option value="3">低（备用）</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="addReservePointId" class="form-label">所属储备点 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addReservePointId" name="reservePointId" required>
+                                    <option value="">请选择储备点</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label for="addRemark" class="form-label">备注</label>
+                                <textarea class="form-control" id="addRemark" name="remark" rows="3" placeholder="请输入备注信息（可选）"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAddMaterial()">确认新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑物资模态框 -->
+    <div class="modal fade" id="editMaterialModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑物资</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editMaterialForm">
+                        <input type="hidden" id="editMaterialId" name="id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="editMaterialName" class="form-label">物资名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editMaterialName" name="materialName" required placeholder="请输入物资名称">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editMaterialType" class="form-label">物资类型 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editMaterialType" name="materialType" required>
+                                    <option value="">请选择物资类型</option>
+                                    <option value="1">帐篷</option>
+                                    <option value="2">食品</option>
+                                    <option value="3">药品</option>
+                                    <option value="4">工具</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editSpec" class="form-label">规格</label>
+                                <input type="text" class="form-control" id="editSpec" name="spec" placeholder="请输入物资规格（可选）">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editStockNum" class="form-label">库存数量 <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="editStockNum" name="stockNum" required min="0" placeholder="请输入库存数量">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editPriorityLevel" class="form-label">优先级 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editPriorityLevel" name="priorityLevel" required>
+                                    <option value="">请选择优先级</option>
+                                    <option value="1">高（紧急）</option>
+                                    <option value="2">中（常规）</option>
+                                    <option value="3">低（备用）</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="editReservePointId" class="form-label">所属储备点 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editReservePointId" name="reservePointId" required>
+                                    <option value="">请选择储备点</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <label for="editRemark" class="form-label">备注</label>
+                                <textarea class="form-control" id="editRemark" name="remark" rows="3" placeholder="请输入备注信息（可选）"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitEditMaterial()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置
+        const apiBaseUrl = 'http://localhost:8080';
+        // 物资类型映射
+        const materialTypeMap = { 1: '帐篷', 2: '食品', 3: '药品', 4: '工具' };
+        // 优先级映射
+        const priorityMap = { 1: '高（紧急）', 2: '中（常规）', 3: '低（备用）' };
+        // 存储全量物资数据（用于前端过滤）
+        let allMaterials = [];
+        // 存储储备点映射（用于显示名称）
+        let reservePointsMap = {};
+
+        // 2. 加载状态控制
+        let loadingLock = false;
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            if (show) {
+                if (loadingLock) return;
+                loadingLock = true;
+                loadingEl.style.display = 'flex';
+            } else {
+                loadingLock = false;
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        // 3. 验证登录状态
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId === 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 退出登录
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 5. 请求工具函数
+        async function fetchGet(url, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`GET ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`GET ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        async function fetchPost(url, data, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    body: JSON.stringify(data),
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`POST ${url} 请求数据：`, data);
+                console.log(`POST ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`POST ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        async function fetchDelete(url, timeout = 10000) {
+            try {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), timeout);
+                
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    signal: controller.signal
+                });
+                clearTimeout(timer);
+
+                const res = await response.json();
+                console.log(`DELETE ${url} 响应：`, res);
+                if (res.code !== 200) {
+                    throw new Error(res.msg || `请求失败（状态码：${res.code}）`);
+                }
+                return res.data;
+            } catch (err) {
+                if (err.name === 'AbortError') err.message = '请求超时，请稍后重试';
+                console.error(`DELETE ${url} 失败：`, err);
+                throw err;
+            }
+        }
+
+        // 6. 加载储备点（下拉框+映射表）
+        async function loadReservePoints(selectIds = []) {
+            try {
+                const reservePoints = await fetchGet(`${apiBaseUrl}/reservePoint/getAllReservePoint`);
+                console.log('加载储备点数据：', reservePoints);
+                
+                // 构建储备点映射表（ID -> 名称）
+                reservePointsMap = {};
+                reservePoints.forEach(point => {
+                    reservePointsMap[point.id] = `${point.province} ${point.city} ${point.pointName}`;
+                });
+                
+                // 填充下拉框
+                selectIds.forEach(selectId => {
+                    const selectEl = $(`#${selectId}`);
+                    selectEl.empty().append('<option value="">请选择储备点</option>');
+                    
+                    reservePoints.forEach(point => {
+                        selectEl.append(`
+                            <option value="${point.id}">${reservePointsMap[point.id]}</option>
+                        `);
+                    });
+                });
+            } catch (err) {
+                console.error('加载储备点失败：', err);
+                alert('加载储备点列表失败，请稍后重试：' + err.message);
+            }
+        }
+
+        // 7. 加载全量物资数据（缓存到全局）
+        async function loadAllMaterials() {
+            try {
+                allMaterials = await fetchGet(`${apiBaseUrl}/material/getMaterialList`);
+                console.log('缓存全量物资数据：', allMaterials);
+                return allMaterials;
+            } catch (err) {
+                console.error('加载物资数据失败：', err);
+                alert('加载物资列表失败，请稍后重试：' + err.message);
+                return [];
+            }
+        }
+
+        // 8. 渲染物资表格（通用方法，支持过滤后的数据）
+        function renderMaterialTable(filteredMaterials) {
+            const tableBody = $('#materialTableBody');
+            tableBody.empty();
+
+            if (!filteredMaterials || filteredMaterials.length === 0) {
+                tableBody.append(`
+                    <tr>
+                        <td colspan="9" class="text-center py-3">未找到符合条件的物资</td>
+                    </tr>
+                `);
+                return;
+            }
+
+            // 渲染表格（库存为0高亮）
+            filteredMaterials.forEach(material => {
+                const stockClass = material.stockNum == 0 ? 'text-danger fw-bold' : '';
+                const pointName = reservePointsMap[material.reservePointId] || '未分配';
+                tableBody.append(`
+                    <tr>
+                        <td>${material.id || '-'}</td>
+                        <td>${material.materialName || '-'}</td>
+                        <td>${materialTypeMap[material.materialType] || '未知类型'}</td>
+                        <td>${material.spec || '-'}</td>
+                        <td class="${stockClass}">${material.stockNum || 0}</td>
+                        <td>${priorityMap[material.priorityLevel] || '普通'}</td>
+                        <td>${pointName}</td>
+                        <td>${formatDate(material.createTime)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info me-2" onclick="editMaterial(${material.id})" data-bs-toggle="modal" data-bs-target="#editMaterialModal">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteMaterial(${material.id})">删除</button>
+                        </td>
+                    </tr>
+                `);
+            });
+        }
+
+        // 9. 初始化加载物资列表
+        async function loadMaterialList() {
+            showLoading(true);
+            try {
+                // 并行加载储备点和物资数据
+                await Promise.all([
+                    loadReservePoints(['addReservePointId', 'searchReservePointId']),
+                    loadAllMaterials()
+                ]);
+                // 渲染全量数据
+                renderMaterialTable(allMaterials);
+            } catch (err) {
+                console.error('初始化物资列表失败：', err);
+                $('#materialTableBody').html(`
+                    <tr>
+                        <td colspan="9" class="text-center py-3 text-danger">加载失败，请稍后重试</td>
+                    </tr>
+                `);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 10. 核心：多条件组合查询（前端过滤，100%生效）
+        async function searchMaterial() {
+            showLoading(true);
+            try {
+                // 获取所有查询条件
+                const keyword = $('#searchMaterialName').val().trim().toLowerCase();
+                const materialType = $('#searchMaterialType').val();
+                const priorityLevel = $('#searchPriorityLevel').val();
+                const reservePointId = $('#searchReservePointId').val();
+
+                console.log('查询条件：', { keyword, materialType, priorityLevel, reservePointId });
+
+                // 确保全量数据已加载
+                if (allMaterials.length === 0) {
+                    await loadAllMaterials();
+                }
+
+                // 前端多条件过滤（所有条件同时满足）
+                const filteredMaterials = allMaterials.filter(material => {
+                    // 1. 物资名称模糊匹配（忽略大小写）
+                    const nameMatch = keyword ? 
+                        (material.materialName && material.materialName.toLowerCase().includes(keyword)) : 
+                        true;
+                    
+                    // 2. 物资类型匹配（为空则匹配所有）
+                    const typeMatch = materialType ? 
+                        (material.materialType == materialType) : 
+                        true;
+                    
+                    // 3. 优先级匹配（为空则匹配所有）
+                    const priorityMatch = priorityLevel ? 
+                        (material.priorityLevel == priorityLevel) : 
+                        true;
+                    
+                    // 4. 储备点匹配（为空则匹配所有）
+                    const pointMatch = reservePointId ? 
+                        (material.reservePointId == reservePointId) : 
+                        true;
+
+                    // 返回所有条件都满足的结果
+                    return nameMatch && typeMatch && priorityMatch && pointMatch;
+                });
+
+                console.log('过滤后物资数量：', filteredMaterials.length);
+                // 渲染过滤后的结果
+                renderMaterialTable(filteredMaterials);
+            } catch (err) {
+                console.error('查询物资失败：', err);
+                alert('查询物资失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 新增物资
+        async function submitAddMaterial() {
+            showLoading(true);
+            const materialData = {
+                materialName: $('#addMaterialName').val().trim(),
+                materialType: $('#addMaterialType').val(),
+                spec: $('#addSpec').val().trim(),
+                stockNum: parseInt($('#addStockNum').val()) || 0,
+                priorityLevel: $('#addPriorityLevel').val(),
+                reservePointId: $('#addReservePointId').val(),
+                remark: $('#addRemark').val().trim(),
+                createTime: new Date().toISOString()
+            };
+
+            // 表单验证
+            const errorMsg = [];
+            if (!materialData.materialName) errorMsg.push('物资名称不能为空');
+            if (!materialData.materialType) errorMsg.push('物资类型不能为空');
+            if (!materialData.priorityLevel) errorMsg.push('优先级不能为空');
+            if (!materialData.reservePointId) errorMsg.push('所属储备点不能为空');
+            if (isNaN(materialData.stockNum) || materialData.stockNum < 0) errorMsg.push('库存数量需为非负整数');
+
+            if (errorMsg.length > 0) {
+                alert('提交失败：\n' + errorMsg.join('\n'));
+                showLoading(false);
+                return;
+            }
+
+            try {
+                await fetchPost(`${apiBaseUrl}/material/addMaterial`, materialData);
+                alert('新增物资成功');
+                $('#addMaterialModal').modal('hide');
+                $('#addMaterialForm')[0].reset();
+                // 重新加载全量数据并刷新表格
+                await loadAllMaterials();
+                renderMaterialTable(allMaterials);
+            } catch (err) {
+                console.error('新增物资失败：', err);
+                alert('新增物资失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 12. 编辑物资
+        async function editMaterial(id) {
+            showLoading(true);
+            try {
+                // 加载储备点下拉框
+                await loadReservePoints(['editReservePointId']);
+                
+                // 从缓存中查找物资（无缓存则重新加载）
+                let material = allMaterials.find(m => m.id == id);
+                if (!material) {
+                    await loadAllMaterials();
+                    material = allMaterials.find(m => m.id == id);
+                }
+
+                if (!material) throw new Error("物资数据不存在");
+                console.log('编辑物资数据：', material);
+
+                // 填充表单
+                $('#editMaterialId').val(material.id || '');
+                $('#editMaterialName').val(material.materialName || '');
+                $('#editMaterialType').val(material.materialType || '');
+                $('#editSpec').val(material.spec || '');
+                $('#editStockNum').val(material.stockNum || 0);
+                $('#editPriorityLevel').val(material.priorityLevel || '');
+                $('#editReservePointId').val(material.reservePointId || '');
+                $('#editRemark').val(material.remark || '');
+            } catch (err) {
+                console.error('加载编辑数据失败：', err);
+                alert('加载物资数据失败，请稍后重试：' + err.message);
+                $('#editMaterialModal').modal('hide');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 13. 提交编辑（不传输update_time）
+        async function submitEditMaterial() {
+            showLoading(true);
+            const materialData = {
+                id: $('#editMaterialId').val(),
+                materialName: $('#editMaterialName').val().trim(),
+                materialType: $('#editMaterialType').val(),
+                spec: $('#editSpec').val().trim(),
+                stockNum: parseInt($('#editStockNum').val()) || 0,
+                priorityLevel: $('#editPriorityLevel').val(),
+                reservePointId: $('#editReservePointId').val(),
+                remark: $('#editRemark').val().trim()
+                // 不传输update_time字段
+            };
+
+            // 表单验证
+            const errorMsg = [];
+            if (!materialData.id) errorMsg.push('物资ID异常');
+            if (!materialData.materialName) errorMsg.push('物资名称不能为空');
+            if (!materialData.materialType) errorMsg.push('物资类型不能为空');
+            if (!materialData.priorityLevel) errorMsg.push('优先级不能为空');
+            if (!materialData.reservePointId) errorMsg.push('所属储备点不能为空');
+            if (isNaN(materialData.stockNum) || materialData.stockNum < 0) errorMsg.push('库存数量需为非负整数');
+
+            if (errorMsg.length > 0) {
+                alert('提交失败：\n' + errorMsg.join('\n'));
+                showLoading(false);
+                return;
+            }
+
+            try {
+                await fetchPost(`${apiBaseUrl}/material/modifyMaterial`, materialData);
+                alert('修改物资成功');
+                $('#editMaterialModal').modal('hide');
+                // 重新加载全量数据并刷新表格
+                await loadAllMaterials();
+                renderMaterialTable(allMaterials);
+            } catch (err) {
+                console.error('修改物资失败：', err);
+                alert('修改物资失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 14. 删除物资
+        async function deleteMaterial(id) {
+            if (!confirm('确定要删除该物资吗？删除后不可恢复')) {
+                return;
+            }
+
+            showLoading(true);
+            try {
+                await fetchDelete(`${apiBaseUrl}/material/deleteMaterial?id=${id}`);
+                alert('删除物资成功');
+                // 重新加载全量数据并刷新表格
+                await loadAllMaterials();
+                renderMaterialTable(allMaterials);
+            } catch (err) {
+                console.error('删除物资失败：', err);
+                alert('删除物资失败，请稍后重试：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 15. 日期格式化
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return '-';
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch (e) {
+                console.error('日期格式化失败：', e);
+                return dateStr || '-';
+            }
+        }
+
+        // 16. 刷新列表（重置查询条件+重新加载）
+        async function refreshMaterialList() {
+            // 重置查询条件
+            $('#searchMaterialName').val('');
+            $('#searchMaterialType').val('');
+            $('#searchPriorityLevel').val('');
+            $('#searchReservePointId').val('');
+            // 重新加载全量数据
+            showLoading(true);
+            try {
+                await loadAllMaterials();
+                renderMaterialTable(allMaterials);
+            } catch (err) {
+                console.error('刷新列表失败：', err);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 17. 页面初始化
+        $(document).ready(() => {
+            console.log('物资管理页面加载完成，API基础地址：', apiBaseUrl);
+            console.log('当前登录用户：', user);
+            // 初始化加载数据
+            loadMaterialList();
+        });
+    </script>
+</body>
+</html>

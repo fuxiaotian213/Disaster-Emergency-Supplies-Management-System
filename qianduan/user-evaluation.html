@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评价反馈 - 用户端</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+    <style>
+        .form-card { max-width: 700px; margin: 2rem auto; }
+        .star-rating { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .star { font-size: 2rem; color: #ddd; cursor: pointer; }
+        .star.active { color: #ffc107; }
+        /* 加载动画（新增） */
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; display: none; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <!-- 加载动画（新增） -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="user-index.html">应急物资调度系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#userNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="userNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="user-index.html">首页</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-disaster-report.html">灾情上报</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-material-apply.html">物资申请</a></li>
+                    <li class="nav-item"><a class="nav-link" href="user-order-query.html">申请进度</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="user-evaluation.html">评价反馈</a></li>
+                </ul>
+                <span class="navbar-text me-3" id="userInfo"></span>
+                <button class="btn btn-light" onclick="logout()">退出登录</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 表单卡片 -->
+    <div class="container">
+        <div class="card form-card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">物资调度评价反馈</h5>
+            </div>
+            <div class="card-body">
+                <div id="orderInfo" class="mb-4 p-3 border rounded bg-light"></div>
+
+                <form id="evaluationForm">
+                    <input type="hidden" id="orderId" name="orderId">
+                    <input type="hidden" id="userId" name="userId">
+
+                    <div class="mb-4">
+                        <label class="form-label">物资适配度</label>
+                        <div class="star-rating" id="materialAdaptStars">
+                            <span class="star" data-score="1">★</span>
+                            <span class="star" data-score="2">★</span>
+                            <span class="star" data-score="3">★</span>
+                            <span class="star" data-score="4">★</span>
+                            <span class="star" data-score="5">★</span>
+                        </div>
+                        <input type="hidden" id="materialAdapt" name="materialAdapt" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">调度效率</label>
+                        <div class="star-rating" id="dispatchEfficiencyStars">
+                            <span class="star" data-score="1">★</span>
+                            <span class="star" data-score="2">★</span>
+                            <span class="star" data-score="3">★</span>
+                            <span class="star" data-score="4">★</span>
+                            <span class="star" data-score="5">★</span>
+                        </div>
+                        <input type="hidden" id="dispatchEfficiency" name="dispatchEfficiency" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="evaluationContent" class="form-label">评价内容（可选）</label>
+                        <textarea class="form-control" id="evaluationContent" name="content" rows="4" placeholder="请填写对物资质量、调度速度、服务态度等的建议或反馈"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">提交评价</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 1. 全局配置（核心：统一管理后端地址）
+        const apiBaseUrl = 'http://localhost:8080';
+
+        // 2. 加载状态控制（新增）
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loadingOverlay');
+            loadingEl.style.display = show ? 'flex' : 'none';
+        }
+
+        // 3. 验证登录状态（保留原逻辑）
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.roleId !== 3) {
+            window.location.href = 'login.html';
+        }
+
+        // 4. 显示用户信息（保留原逻辑）
+        $('#userInfo').text(`欢迎，${user.realName}`);
+
+        // 5. 退出登录（保留原逻辑）
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        // 6. 获取URL中的orderId（保留原逻辑）
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+
+        // 7. 初始化评分组件（保留原逻辑）
+        function initStarRating(starContainerId, inputId) {
+            const stars = $(`#${starContainerId} .star`);
+            const input = $(`#${inputId}`);
+
+            stars.click(function() {
+                const score = $(this).data('score');
+                input.val(score);
+                // 更新星星样式
+                stars.each(function() {
+                    $(this).toggleClass('active', $(this).data('score') <= score);
+                });
+            });
+        }
+
+        // 8. 发送GET请求的工具函数（新增）
+        async function fetchGet(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res.data;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 9. 发送POST请求的工具函数（新增）
+        async function fetchPost(url, data) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const res = await response.json();
+                if (res.code !== 200) {
+                    throw new Error(res.msg || '请求失败');
+                }
+                return res;
+            } catch (err) {
+                console.error(`请求${url}失败：`, err);
+                throw err;
+            }
+        }
+
+        // 10. 加载订单信息（Axios → Fetch改造）
+        async function loadOrderInfo() {
+            showLoading(true);
+            if (!orderId) {
+                $('#orderInfo').html('<div class="text-danger">未选择要评价的订单，请从申请进度页面进入</div>');
+                $('#evaluationForm').find('button[type="submit"]').prop('disabled', true);
+                showLoading(false);
+                return;
+            }
+
+            try {
+                // 获取订单信息
+                const order = await fetchGet(`${apiBaseUrl}/order/getOrderById?id=${orderId}`);
+
+                // 验证订单归属和状态（保留原逻辑）
+                if (order.userId !== user.id || order.orderStatus !== 3) {
+                    $('#orderInfo').html('<div class="text-danger">该订单不可评价（可能已评价或状态不符）</div>');
+                    $('#evaluationForm').find('button[type="submit"]').prop('disabled', true);
+                    showLoading(false);
+                    return;
+                }
+
+                // 获取物资信息
+                const material = await fetchGet(`${apiBaseUrl}/material/getMaterialById?id=${order.materialId}`);
+
+                // 显示订单信息（保留原逻辑）
+                $('#orderInfo').html(`
+                    <h6>订单信息</h6>
+                    <p>订单编号：${order.orderNo || '无'}</p>
+                    <p>物资名称：${material.materialName}</p>
+                    <p>申请数量：${order.applyNum} ${material.spec || ''}</p>
+                    <p>签收时间：${formatDate(order.signTime)}</p>
+                `);
+
+                // 设置隐藏字段（保留原逻辑）
+                $('#orderId').val(orderId);
+                $('#userId').val(user.id);
+            } catch (err) {
+                console.error('加载订单信息失败：', err);
+                $('#orderInfo').html(`<div class="text-danger">加载订单信息失败：${err.message}</div>`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 11. 表单提交（Axios → Fetch改造）
+        $('#evaluationForm').submit(async function(e) {
+            e.preventDefault();
+            const evaluation = {
+                orderId: $('#orderId').val(),
+                userId: $('#userId').val(),
+                materialAdapt: $('#materialAdapt').val(),
+                dispatchEfficiency: $('#dispatchEfficiency').val(),
+                content: $('#evaluationContent').val()
+            };
+
+            // 前端验证（保留原逻辑）
+            if (!evaluation.materialAdapt || !evaluation.dispatchEfficiency) {
+                alert('请为物资适配度和调度效率评分');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const res = await fetchPost(`${apiBaseUrl}/evaluation/addEvaluation`, evaluation);
+                alert(res.msg || '评价提交成功，感谢您的反馈');
+                window.location.href = 'user-order-query.html';
+            } catch (err) {
+                alert('评价提交失败：' + err.message);
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // 12. 日期格式化（保留原逻辑）
+        function formatDate(dateStr) {
+            if (!dateStr) return '无';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', { 
+                year: 'numeric', month: '2-digit', day: '2-digit', 
+                hour: '2-digit', minute: '2-digit' 
+            });
+        }
+
+        // 13. 页面加载时执行（保留原逻辑）
+        $(document).ready(() => {
+            initStarRating('materialAdaptStars', 'materialAdapt');
+            initStarRating('dispatchEfficiencyStars', 'dispatchEfficiency');
+            loadOrderInfo();
+        });
+    </script>
+</body>
+</html>
