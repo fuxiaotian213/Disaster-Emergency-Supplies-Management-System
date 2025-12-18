@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.EvaluationMapper">
+
+    <!-- 评价结果集映射 -->
+    <resultMap id="EvaluationResultMap" type="com.ruoyi.disaster.domain.Evaluation">
+        <id column="id" property="id"/>
+        <result column="order_id" property="orderId"/>
+        <result column="user_id" property="userId"/>
+        <result column="material_adapt" property="materialAdapt"/>
+        <result column="dispatch_efficiency" property="dispatchEfficiency"/>
+        <result column="gov_suggestion" property="govSuggestion"/>
+        <result column="is_gov_feedback" property="isGovFeedback"/>
+        <result column="content" property="content"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+    <delete id="deleteEvaluation"></delete>
+
+    <!-- 1. 按订单ID查询评价 -->
+    <select id="queryByOrderId" parameterType="java.lang.Long" resultMap="EvaluationResultMap">
+        SELECT id, order_id, user_id, material_adapt, dispatch_efficiency,
+               gov_suggestion, is_gov_feedback, content, create_time
+        FROM biz_evaluation
+        WHERE order_id = #{orderId}
+    </select>
+
+    <!-- 2. 按用户ID查询评价列表 -->
+    <select id="queryByUserId" parameterType="java.lang.Long" resultMap="EvaluationResultMap">
+        SELECT id, order_id, user_id, material_adapt, dispatch_efficiency,
+               gov_suggestion, is_gov_feedback, content, create_time
+        FROM biz_evaluation
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 3. 按政府反馈状态查询评价 -->
+    <select id="queryByGovFeedbackStatus" parameterType="java.lang.Integer" resultMap="EvaluationResultMap">
+        SELECT id, order_id, user_id, material_adapt, dispatch_efficiency,
+               gov_suggestion, is_gov_feedback, content, create_time
+        FROM biz_evaluation
+        WHERE is_gov_feedback = #{isGovFeedback}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 4. 新增评价 -->
+    <insert id="saveEvaluation" parameterType="com.ruoyi.disaster.domain.Evaluation">
+        INSERT INTO biz_evaluation (
+            order_id, use  r_id, material_adapt, dispatch_efficiency,
+            gov_suggestion, is_gov_feedback, content, create_time
+        ) VALUES (
+                     #{orderId}, #{userId}, #{materialAdapt}, #{dispatchEfficiency},
+                     #{govSuggestion}, #{isGovFeedback}, #{content}, NOW()
+                 )
+    </insert>
+
+    <!-- 5. 政府回复评价（更新反馈状态） -->
+    <update id="replyEvaluation">
+        UPDATE biz_evaluation
+        SET is_gov_feedback = #{isGovFeedback},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="queryFeedbackStatistics" resultType="java.util.Map">
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS handled
+        FROM biz_evaluation
+    </select>
+
+    <!-- 2. 加载所有反馈（支持筛选） -->
+    <select id="queryAllFeedback" resultMap="EvaluationResultMap">
+        SELECT
+        e.*, u.real_name  <!-- 关联用户表获取用户名 -->
+        FROM biz_evaluation e
+        LEFT JOIN user u ON e.user_id = u.id
+        <where>
+            <!-- 用户名模糊筛选 -->
+            <if test="userName != null and userName != ''">
+                AND u.real_name LIKE CONCAT('%', #{userName}, '%')
+            </if>
+            <!-- 反馈类型筛选 -->
+            <if test="feedbackType != null">
+                AND e.feedback_type = #{feedbackType}
+            </if>
+            <!-- 处理状态筛选 -->
+            <if test="status != null">
+                AND e.status = #{status}
+            </if>
+        </where>
+        ORDER BY e.create_time DESC
+    </select>
+
+    <!-- 3. 按ID查询反馈详情 -->
+    <select id="queryFeedbackById" parameterType="java.lang.Long" resultMap="EvaluationResultMap">
+        SELECT
+        e.*, u.real_name, u.phone, u.email  <!-- 关联用户表获取联系方式 -->
+        FROM biz_evaluation e
+        LEFT JOIN user u ON e.user_id = u.id
+        WHERE e.id = #{id}
+    </select>
+
+    <!-- 4. 处理反馈（更新状态和回复） -->
+    <update id="updateFeedbackHandle">
+        UPDATE biz_evaluation
+        SET
+            status = #{status},
+            reply = #{reply},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 5. 批量处理反馈（仅更新待处理的反馈） -->
+    <update id="batchUpdateFeedbackHandle">
+        UPDATE biz_evaluation
+        SET
+        status = #{status},
+        reply = #{reply},
+        update_time = NOW()
+        WHERE status = 0  <!-- 只处理待处理状态的反馈 -->
+    </update>
+
+
+</mapper>

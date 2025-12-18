@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.DisasterMapper">
+
+    <resultMap id="DisasterResultMap" type="com.ruoyi.disaster.domain.Disaster">
+        <id column="id" property="id"/>
+        <result column="disaster_name" property="disasterName"/>
+        <result column="disaster_level" property="disasterLevel"/>
+        <result column="disaster_area" property="disasterArea"/>
+        <result column="affect_people" property="affectPeople"/>
+        <result column="report_user_id" property="reportUserId"/>
+        <result column="approve_dept" property="approveDept"/>
+        <result column="approve_user_id" property="approveUserId"/>
+        <result column="approve_status" property="approveStatus"/>
+        <result column="description" property="description"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+
+
+
+    <select id="queryAll" parameterType="com.ruoyi.disaster.domain.Disaster" resultMap="DisasterResultMap">
+        SELECT
+        id, disaster_name, disaster_level, disaster_area,
+        affect_people, report_user_id, approve_dept, approve_user_id,
+        approve_status, description, create_time
+        FROM biz_disaster
+        <where>
+            <!-- 灾情名称：模糊查询 -->
+            <if test="disaster.disasterName != null and disaster.disasterName != ''">
+                AND disaster_name LIKE CONCAT('%', #{disaster.disasterName}, '%')
+            </if>
+            <!-- 灾情等级：精确匹配 -->
+            <if test="disaster.disasterLevel != null">
+                AND disaster_level = #{disaster.disasterLevel}
+            </if>
+            <!-- 审核状态：精确匹配 -->
+            <if test="disaster.approveStatus != null">
+                AND approve_status = #{disaster.approveStatus}
+            </if>
+        </where>
+        <!-- 按上报时间降序，最新的灾情在前 -->
+        ORDER BY create_time DESC
+    </select>
+
+
+
+
+
+
+    <!-- 1. 按ID查询灾情 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="DisasterResultMap">
+        SELECT id, disaster_name, disaster_level, disaster_area, affect_people,
+               report_user_id, approve_dept, approve_user_id, approve_status,
+               description, create_time
+        FROM biz_disaster
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 2. 按ID列表批量查询灾情 -->
+    <select id="queryByIds" parameterType="java.util.List" resultMap="DisasterResultMap">
+        SELECT id, disaster_name, disaster_level, disaster_area, affect_people,
+               report_user_id, approve_dept, approve_user_id, approve_status,
+               description, create_time
+        FROM biz_disaster
+        WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 2. 按上报人ID查询灾情列表 -->
+    <select id="queryByReportUserId" parameterType="java.lang.Long" resultMap="DisasterResultMap">
+        SELECT id, disaster_name, disaster_level, disaster_area, affect_people,
+               report_user_id, approve_dept, approve_user_id, approve_status,
+               description, create_time
+        FROM biz_disaster
+        WHERE report_user_id = #{reportUserId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 3. 按审核状态查询灾情列表 -->
+    <select id="queryByApproveStatus" parameterType="java.lang.Integer" resultMap="DisasterResultMap">
+        SELECT id, disaster_name, disaster_level, disaster_area, affect_people,
+               report_user_id, approve_dept, approve_user_id, approve_status,
+               description, create_time
+        FROM biz_disaster
+        WHERE approve_status = #{approveStatus}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 4. 按条件查询灾情 -->
+    <select id="queryByCondition" resultMap="DisasterResultMap">
+        SELECT id, disaster_name, disaster_level, disaster_area, affect_people,
+        report_user_id, approve_dept, approve_user_id, approve_status,
+        description, create_time
+        FROM biz_disaster
+        <where>
+            <if test="disasterLevel != null">AND disaster_level = #{disasterLevel}</if>
+            <if test="disasterArea != null and disasterArea != ''">AND disaster_area LIKE CONCAT('%', #{disasterArea}, '%')</if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 5. 新增灾情 -->
+    <insert id="saveDisaster" parameterType="com.ruoyi.disaster.domain.Disaster">
+        INSERT INTO biz_disaster (
+            disaster_name, disaster_level, disaster_area, affect_people,
+            report_user_id, approve_dept, approve_user_id, approve_status,
+            description, create_time
+        ) VALUES (
+                     #{disasterName}, #{disasterLevel}, #{disasterArea}, #{affectPeople},
+                     #{reportUserId}, #{approveDept}, #{approveUserId}, #{approveStatus},
+                     #{description}, NOW()
+                 )
+    </insert>
+
+    <!-- 6. 审核灾情 -->
+    <update id="auditDisaster">
+        UPDATE biz_disaster
+        SET approve_status = #{approveStatus},
+            approve_user_id = #{approveUserId},
+            approve_dept = #{approveDept}
+        WHERE id = #{id}
+    </update>
+    <update id="updateAudit" parameterType="com.ruoyi.disaster.domain.Disaster">
+        UPDATE biz_disaster
+        SET
+            approve_status = #{approveStatus},
+            approve_user_id = #{approveUserId},
+            approve_dept = #{approveDept},
+            approve_remark = #{approveRemark}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 7. 删除灾情 -->
+    <delete id="deleteDisaster" parameterType="java.lang.Long">
+        DELETE FROM biz_disaster WHERE id = #{id}
+    </delete>
+</mapper>

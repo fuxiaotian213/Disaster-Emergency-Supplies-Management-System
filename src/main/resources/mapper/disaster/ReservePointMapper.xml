@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.disaster.mapper.ReservePointMapper">
+
+    <!-- 储备点结果集映射 -->
+    <resultMap id="ReservePointResultMap" type="com.ruoyi.disaster.domain.ReservePoint">
+        <id column="id" property="id"/>
+        <result column="point_name" property="pointName"/>
+        <result column="province" property="province"/>
+        <result column="city" property="city"/>
+        <result column="address" property="address"/>
+        <result column="contact_person" property="contactPerson"/>
+        <result column="contact_phone" property="contactPhone"/>
+        <result column="manage_dept" property="manageDept"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="queryByIds" parameterType="java.util.List" resultMap="ReservePointResultMap">
+        SELECT
+        id, point_name, province, city, address,
+        contact_person, contact_phone, manage_dept, create_time
+        FROM biz_reserve_point
+        WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY id ASC
+    </select>
+
+    <!-- 1. 按ID查询储备点 -->
+    <select id="queryById" parameterType="java.lang.Long" resultMap="ReservePointResultMap">
+        SELECT id, point_name, province, city, address,
+               contact_person, contact_phone, manage_dept, create_time
+        FROM biz_reserve_point
+        WHERE id = #{id}
+    </select>
+
+    <!-- 2. 按省市查询储备点 -->
+    <select id="queryByProvinceCity" resultMap="ReservePointResultMap">
+        SELECT id, point_name, province, city, address,
+               contact_person, contact_phone, manage_dept, create_time
+        FROM biz_reserve_point
+        WHERE province = #{province}
+          AND city = #{city}
+        ORDER BY point_name ASC
+    </select>
+
+    <!-- 3. 查询所有储备点 -->
+    <select id="queryAll" resultMap="ReservePointResultMap">
+        SELECT id, point_name, province, city, address,
+               contact_person, contact_phone, manage_dept, create_time
+        FROM biz_reserve_point
+        ORDER BY province ASC, city ASC, point_name ASC
+    </select>
+
+    <!-- 4. 新增储备点 -->
+    <insert id="saveReservePoint" parameterType="com.ruoyi.disaster.domain.ReservePoint">
+        INSERT INTO biz_reserve_point (
+            point_name, province, city, address,
+            contact_person, contact_phone, manage_dept, create_time
+        ) VALUES (
+                     #{pointName}, #{province}, #{city}, #{address},
+                     #{contactPerson}, #{contactPhone}, #{manageDept}, NOW()
+                 )
+    </insert>
+
+    <!-- 5. 修改储备点（修复：移除SET子句最后一个逗号） -->
+    <update id="updateReservePoint" parameterType="com.ruoyi.disaster.domain.ReservePoint">
+        UPDATE biz_reserve_point
+        SET point_name = #{pointName},
+        province = #{province},
+        city = #{city},
+        address = #{address},
+        contact_person = #{contactPerson},
+        contact_phone = #{contactPhone},
+        manage_dept = #{manageDept}  <!-- 这里删除了多余的逗号 -->
+        WHERE id = #{id}
+    </update>
+
+    <!-- 6. 删除储备点 -->
+    <delete id="deleteReservePoint" parameterType="java.lang.Long">
+        DELETE FROM biz_reserve_point WHERE id = #{id}
+    </delete>
+
+</mapper>
